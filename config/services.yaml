@@ -1,0 +1,14 @@
+services:
+  _defaults:
+    autowire: false
+    autoconfigure: false
+    public: false
+
+  Jav\ApiTopiaBundle\Loader\RouteLoader:
+    tags: [routing.loader]
+
+  Jav\ApiTopiaBundle\Rest\ResponseHandler:
+    arguments: [!tagged_locator { tag: 'apitopia.resolver' }, '@Jav\ApiTopiaBundle\Serializer\Serializer']
+    tags: [controller.service_arguments]
+
+  Jav\ApiTopiaBundle\Serializer\Serializer: ~
