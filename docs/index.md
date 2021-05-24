@@ -60,7 +60,8 @@ a new endpoint, whether it is REST or GraphQL, you have to provide
 an implementation of ResolverInterface.
 
 Classes that inherit ResolverInterface will be automatically tagged as apitopia.resolver
-and be processed for Attributes parsing.
+and be processed for Attributes parsing. They are considered as services, so you can
+use dependency injection like you want inside your Resolvers.
 
 Annotations provided are:
 - Get
@@ -96,6 +97,7 @@ Let's take a simple example:
 use Jav\ApiTopiaBundle\Api\Attributes\Rest\Delete;
 use Jav\ApiTopiaBundle\Api\Attributes\Rest\Get;
 use Jav\ApiTopiaBundle\Api\Attributes\Rest\Post;
+use Jav\ApiTopiaBundle\Api\Attributes\Rest\Put;
 use Jav\ApiTopiaBundle\Api\ResolverInterface;
 use App\Entity\Dummy;
 
@@ -113,7 +115,7 @@ class DummyResolver implements ResolverInterface
         return $object;
     }
     
-    #[Get(path: '/dummy/{id}', output: [Dummy::class], name: 'api_dummy_collection')]
+    #[Get(path: '/dummies', output: [Dummy::class], name: 'api_dummy_collection')]
     public function getCollection()
     {
         $object = new Dummy();
@@ -139,7 +141,7 @@ class DummyResolver implements ResolverInterface
         return $dummy;
     }
     
-    #[Post(path: '/dummy/{id}/update', output: [], name: 'api_dummy_update', outputType: 'application/xml')]
+    #[Put(path: '/dummy/{id}/update', output: [], name: 'api_dummy_update', outputType: 'application/xml')]
     public function putItem(int $id, array $dummy)
     {
         // Process the dummy...
