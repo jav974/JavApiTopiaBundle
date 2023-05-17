@@ -24,9 +24,9 @@ class ResolverProvider
         return $this->locator->get($class);
     }
 
-    public function getResolveCallback(Attribute $attribute): \Closure
+    public function getResolveCallback(Attribute $attribute, ?string $wrapUnderName = null): \Closure
     {
-        return function($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute) {
+        return function($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute, $wrapUnderName) {
             $resolver = $this->getResolver($attribute->resolver);
             $context = $context ?? [];
             $context['info'] = $resolveInfo;
@@ -36,7 +36,13 @@ class ResolverProvider
                 $context['args'] = $args;
             }
 
-            return $resolver($context);
+            $data = $resolver($context);
+
+            if (!empty($wrapUnderName)) {
+                return [$wrapUnderName => $data];
+            }
+
+            return $data;
         };
     }
 }

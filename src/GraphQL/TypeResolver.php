@@ -166,10 +166,9 @@ class TypeResolver
         ]);
     }
 
-    public function resolveMutationOutput(string $schemaName, string $className, string $outputType, Attribute $attribute): ObjectType
+    public function resolveMutationOutput(string $schemaName, string $fieldName, string $outputType, Attribute $attribute): ObjectType
     {
         $name = "{$attribute->name}Output";
-        $fieldName = lcfirst(substr($className, strrpos($className, '\\') + 1));
 
         return $this->types[$name] ??= new ObjectType([
             'name' => $name,

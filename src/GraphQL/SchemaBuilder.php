@@ -136,10 +136,12 @@ class SchemaBuilder
                     $args = ['input' => ['type' => Type::nonNull($this->typeResolver->resolveMutationAttributeArgs($schemaName, $mutation))]];
                 }
 
+                $fieldName = lcfirst(substr($className, strrpos($className, '\\') + 1));
+
                 $fields[$operationName] = [
-                    'type' => Type::nonNull($this->typeResolver->resolveMutationOutput($schemaName, $className, $outputType, $mutation)),
+                    'type' => Type::nonNull($this->typeResolver->resolveMutationOutput($schemaName, $fieldName, $outputType, $mutation)),
                     'args' => $args,
-                    'resolve' => $this->resolverProvider->getResolveCallback($mutation),
+                    'resolve' => $this->resolverProvider->getResolveCallback($mutation, $fieldName),
                 ];
             }
         }
