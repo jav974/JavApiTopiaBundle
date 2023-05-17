@@ -3,24 +3,30 @@
 namespace Jav\ApiTopiaBundle\Loader;
 
 use Jav\ApiTopiaBundle\Api\Attributes\Rest\Attribute;
-use Jav\ApiTopiaBundle\Api\Attributes\Rest\Get;
 use Symfony\Component\Config\Loader\Loader;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
 
 class RouteLoader extends Loader
 {
-    private $isLoaded = false;
+    private bool $isLoaded = false;
 
     /** @var string[] */
-    private $resolvers = [];
+    private array $resolvers = [];
 
-    public function setResolvers(array $resolvers)
+    private array $graphQLEndpoints = [];
+
+    public function setResolvers(array $resolvers): void
     {
         $this->resolvers = $resolvers;
     }
 
-    public function load($resource, string $type = null)
+    public function setGraphQLEndpoints(array $endpoints): void
+    {
+        $this->graphQLEndpoints = $endpoints;
+    }
+
+    public function load($resource, string $type = null): RouteCollection
     {
         if ($this->isLoaded) {
             throw new \RuntimeException('Do not add the "apitopia" loader twice');
@@ -28,6 +34,28 @@ class RouteLoader extends Loader
 
         $routes = new RouteCollection();
 
+        $this->loadRestRoutes($routes);
+        $this->loadGraphQLEndpoints($routes);
+        $this->isLoaded = true;
+
+        return $routes;
+    }
+
+    private function loadGraphQLEndpoints(RouteCollection $routes): void
+    {
+        foreach ($this->graphQLEndpoints as $schemaName =>  $endpoint) {
+            $routes->add('apitopia_graphql_' . $schemaName, new Route($endpoint, [
+                '_controller' => 'Jav\ApiTopiaBundle\GraphQL\RequestHandler::handleRequest',
+                '_apitopia' => [
+                    'schema' => $schemaName,
+                    'endpoint' => $endpoint
+                ]
+            ], methods: ['POST']));
+        }
+    }
+
+    private function loadRestRoutes(RouteCollection $routes): void
+    {
         foreach ($this->resolvers as $resolverClass) {
             $reflection = new \ReflectionClass($resolverClass);
 
@@ -54,13 +82,9 @@ class RouteLoader extends Loader
                 }
             }
         }
-
-        $this->isLoaded = true;
-
-        return $routes;
     }
 
-    public function supports($resource, string $type = null)
+    public function supports($resource, string $type = null): bool
     {
         return $type === 'apitopia';
     }

@@ -3,14 +3,12 @@
 namespace Jav\ApiTopiaBundle\DependencyInjection\Compiler;
 
 use Jav\ApiTopiaBundle\Loader\RouteLoader;
-use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\Definition;
 
 class ResolverPass implements CompilerPassInterface
 {
-    public function process(ContainerBuilder $container)
+    public function process(ContainerBuilder $container): void
     {
         $resolverIds = array_keys($container->findTaggedServiceIds('apitopia.resolver'));
         $classes = [];
@@ -19,8 +17,6 @@ class ResolverPass implements CompilerPassInterface
             $definition = $container->findDefinition($resolverId);
             $class = $definition->getClass();
             $classes[] = $class;
-
-            // Introspect the class to extract graphql attributes
         }
 
         $routeLoaderDefinition = $container->getDefinition(RouteLoader::class);

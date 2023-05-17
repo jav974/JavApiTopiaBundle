@@ -25,15 +25,15 @@ abstract class Attribute
      * For collection query, put the desired FQN as array: [Entity::class]
      * @var string|string[]
      */
-    public string|array $output;
+    public string|array|null $output;
 
     /**
      * Query constructor.
-     * @param string|string[] $output
+     * @param string|string[]|null $output
      * @param string|null $name
      * @param string|null $description
      */
-    public function __construct(array|string $output, ?string $name = null, ?string $description = null)
+    public function __construct(array|string|null $output, ?string $name = null, ?string $description = null)
     {
         $this->output = $output;
         $this->name = $name;

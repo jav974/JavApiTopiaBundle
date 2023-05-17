@@ -21,7 +21,7 @@ class JavApiTopiaBundle extends Bundle
         return new ApiTopiaExtension();
     }
     
-    public function build(ContainerBuilder $container)
+    public function build(ContainerBuilder $container): void
     {
         $container->addCompilerPass(new ResolverPass());
     }

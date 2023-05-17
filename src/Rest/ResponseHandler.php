@@ -22,7 +22,7 @@ class ResponseHandler
         $this->serializer = $serializer;
     }
 
-    public function handleResponse(Request $request)
+    public function handleResponse(Request $request): ?Response
     {
         $config = $request->attributes->get('_apitopia');
         /** @var Attribute $attribute */
@@ -38,7 +38,7 @@ class ResponseHandler
             $this->checkOutput($attribute, $data);
 
             return $this->serialize($attribute, $data);
-        } catch (\ReflectionException $e) {
+        } catch (\ReflectionException|\Exception $e) {
         }
 
         return null;
@@ -49,10 +49,8 @@ class ResponseHandler
      * Deserialize the parameters to objects if resolver method signature requires so
      *
      * @param \ReflectionParameter[] $reflectionParams
-     * @param Request $request
-     * @return array
      */
-    private function parseParams(array $reflectionParams, Request $request)
+    private function parseParams(array $reflectionParams, Request $request): array
     {
         $params = [];
 
@@ -79,19 +77,27 @@ class ResponseHandler
         return $params;
     }
 
-    private function serialize(Attribute $attribute, $data)
+    private function serialize(Attribute $attribute, $data): Response
     {
-        switch ($attribute->outputType) {
-            case Attribute::OUTPUT_TYPE_JSON:
-                return new Response($this->serializer->serialize($data), 200, ['Content-Type' => 'application/json']);
-            case Attribute::OUTPUT_TYPE_XML:
-                return new Response($this->serializer->serialize($data, 'xml'), 200, ['Content-Type' => 'application/xml']);
-        }
-
-        return null;
+        return match ($attribute->outputType) {
+            Attribute::OUTPUT_TYPE_JSON => new Response(
+                $this->serializer->serialize($data),
+                200,
+                ['Content-Type' => 'application/json']
+            ),
+            Attribute::OUTPUT_TYPE_XML => new Response(
+                $this->serializer->serialize($data, 'xml'),
+                200,
+                ['Content-Type' => 'application/xml']
+            ),
+            default => null,
+        };
     }
 
-    private function checkOutput(Attribute $attribute, $data)
+    /**
+     * @throws \Exception
+     */
+    private function checkOutput(Attribute $attribute, $data): void
     {
         $outputIsArray = is_array($attribute->output);
         $outputIsArrayObject = $outputIsArray && !empty($attribute->output);
