@@ -3,8 +3,14 @@
 namespace Jav\ApiTopiaBundle\GraphQL;
 
 use GraphQL\Type\Definition\InputObjectType;
+use GraphQL\Type\Definition\ListOfType;
+use GraphQL\Type\Definition\NonNull;
+use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type;
+use GraphQLRelay\Connection\Connection;
+use GraphQLRelay\Relay;
+use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQueryCollection;
 use RuntimeException;
@@ -13,15 +19,40 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 class TypeResolver
 {
     private array $types;
+    private array $nodeDefinition;
 
-    public function __construct(private readonly ResourceLoader $resourceLoader, private readonly ResolverProvider $resolverProvider)
-    {
+    public function __construct(
+        private readonly ResourceLoader $resourceLoader,
+        private readonly ResolverProvider $resolverProvider,
+        private readonly ?NodeResolverInterface $nodeResolver = null
+    ) {
         $this->types = Type::getStandardTypes();
+        $this->nodeDefinition = Relay::nodeDefinitions(
+            function ($globalId) {
+                $idComponents = Relay::fromGlobalId($globalId);
+
+                return $this->nodeResolver?->resolve($idComponents['type'], $idComponents['id']);
+            },
+            function ($object) {
+                return null;
+            }
+        );
+        $this->types['Node'] = $this->nodeDefinition['nodeInterface'];
+        $this->types['PageInfo'] = Connection::pageInfoType();
+    }
+
+    public function getNodeDefinition(): array
+    {
+        return $this->nodeDefinition;
     }
 
     public function resolve(string $schemaName, string $classPath, bool $isCollection, bool $input = false): Type
     {
-        $typeName = basename($classPath);
+        if (str_contains($classPath, '\\')) {
+            $typeName = substr($classPath, strrpos($classPath, '\\') + 1);
+        } else {
+            $typeName = $classPath;
+        }
 
         if (in_array($typeName, ['int', 'float', 'string', 'boolean', 'bool', 'ID'])) {
             $typeName = $typeName === 'bool' ? 'boolean' : $typeName;
@@ -69,15 +100,56 @@ class TypeResolver
         return $input ? $this->createInputType($schemaName, $reflectionClass) : $this->createObjectType($schemaName, $reflectionClass);
     }
 
+    public function getObjectTypeField(string $schemaName, string $classPath, ?string $comment, bool $allowsNull, ?Attribute $attribute, bool $isCollection): array
+    {
+        $field = [];
+        $outputClassName = str_replace('[]', '', $classPath);
+
+        if (str_contains($outputClassName, '\\')) {
+            $outputClassName = substr($outputClassName, strrpos($outputClassName, '\\') + 1);
+        }
+
+        $type = $this->resolveTypeFromSchema($outputClassName, $schemaName);
+        $type = $this->resolve($schemaName, $type, $isCollection);
+
+        if (!$allowsNull) {
+            $type = Type::nonNull($type);
+        }
+
+        if ($attribute) {
+            $field['args'] = $this->resolveAttributeArgs($schemaName, $attribute);
+            $field['resolve'] = $this->resolverProvider->getResolveCallback($attribute);
+        }
+
+        if ($attribute instanceof QueryCollection) {
+            $type = $this->getRelayConnection($schemaName, $outputClassName, $type);
+            $field['args'] += Relay::connectionArgs();
+        }
+
+        $field['type'] = $type;
+
+        if ($comment) {
+            $field['description'] = $comment;
+        }
+
+        return $field;
+    }
+
     private function createObjectType(string $schemaName, \ReflectionClass $reflectionClass): ObjectType
     {
-        $description = TypeUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null);
+        // If it is an ApiResource, make it available in the schema with Relay specification
+        $isNodeInterface = (bool)($reflectionClass->getAttributes(ApiResource::class)[0] ?? null);
 
-        $type = new ObjectType([
+        $description = TypeUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null);
+        $objectTypeData = [
             'name' => $reflectionClass->getShortName(),
             'description' => $description,
-            'fields' => function () use ($reflectionClass, $schemaName) {
+            'fields' => function () use ($reflectionClass, $schemaName, $isNodeInterface) {
                 $fields = [];
+
+                if ($isNodeInterface) {
+                    $fields['id'] = Relay::globalIdField();
+                }
 
                 foreach ($reflectionClass->getProperties() as $reflectionProperty) {
                     $queryCollectionAttribute = $reflectionProperty->getAttributes(SubQueryCollection::class)[0] ?? null;
@@ -87,34 +159,76 @@ class TypeResolver
                     $type = $reflectionProperty->getType()?->getName();
                     $isCollection = in_array($type ?? '', ['iterable', 'array']);
                     $type = $isCollection ? $queryCollection?->output ?? TypeUtils::getTypeFromDocComment($comment) : $type;
-                    $type = $this->resolveTypeFromSchema($type, $schemaName);
-                    $allowsNull = $reflectionProperty->getType()?->allowsNull() ?? true;
-                    $type = $this->resolve($schemaName, $type, $isCollection);
-
-                    if (!$allowsNull) {
-                        $type = Type::nonNull($type);
-                    }
-
                     $propertyName = $reflectionProperty->getName();
 
-                    $fields[$propertyName] = [
-                        'type' => $type,
-                        'description' => TypeUtils::getDescriptionFromDocComment($comment),
-                    ];
-
-                    if ($queryCollection) {
-                        $fields[$propertyName]['args'] = $this->resolveAttributeArgs($schemaName, $queryCollection);
-                        $fields[$propertyName]['resolve'] = $this->resolverProvider->getResolveCallback($queryCollection);
+                    if ($propertyName === 'id' && $isNodeInterface) {
+                        $propertyName = '_id';
                     }
+
+                    $fields[$propertyName] = $this->getObjectTypeField(
+                        $schemaName,
+                        $type,
+                        TypeUtils::getDescriptionFromDocComment($comment),
+                        $reflectionProperty->getType()?->allowsNull() ?? true,
+                        $queryCollection,
+                        $isCollection
+                    );
                 }
 
                 return $fields;
             },
-        ]);
+        ];
+
+        if ($isNodeInterface) {
+            $objectTypeData['interfaces'] = [$this->nodeDefinition['nodeInterface']];
+        }
+
+        $type = new ObjectType($objectTypeData);
 
         $this->types[$schemaName . '.' . $reflectionClass->getShortName()] = $type;
 
         return $type;
+    }
+
+    private function getRelayConnection(string $schemaName, string $outputClassName, Type $type)
+    {
+        if ($type instanceof NonNull || $type instanceof ListOfType) {
+            $type = $type->getInnerMostType();
+        }
+
+        $edgeName = $outputClassName . 'Edge';
+        $connectionName = $outputClassName . 'CursorConnection';
+
+        if (isset($this->types["$schemaName.$edgeName"])) {
+            $edge = $this->types["$schemaName.$edgeName"];
+        } else {
+            $edge = Relay::edgeType([
+                'nodeType' => $type,
+                'name' => $outputClassName,
+            ]);
+            $this->types["$schemaName.$edgeName"] = $edge;
+        }
+
+        if (isset($this->types["$schemaName.$connectionName"])) {
+            $connection = $this->types["$schemaName.$connectionName"];
+        } else {
+            $connection = Relay::connectionType([
+                'nodeType' => $type,
+                'edgeType' => $edge,
+                'connectionFields' => [
+                    'totalCount' => [
+                        'type' => Type::nonNull(Type::int()),
+                        'description' => 'The total count of items in the connection.',
+                        'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
+                    ],
+                ],
+                'name' => $outputClassName . 'Cursor'
+            ]);
+
+            $this->types["$schemaName.$connectionName"] = $connection;
+        }
+
+        return $connection;
     }
 
     private function createInputType(string $schemaName, \ReflectionClass $reflectionClass): InputObjectType
@@ -156,28 +270,9 @@ class TypeResolver
         return $type;
     }
 
-    public function resolveMutationAttributeArgs(string $schemaName, Attribute $attribute): InputObjectType
+    public function setType(string $schemaName, string $name, Type $type): void
     {
-        $name = "{$attribute->name}Input";
-
-        return $this->types[$name] ??= new InputObjectType([
-            'name' => $name,
-            'fields' => $this->resolveAttributeArgs($schemaName, $attribute, true),
-        ]);
-    }
-
-    public function resolveMutationOutput(string $schemaName, string $fieldName, string $outputType, Attribute $attribute): ObjectType
-    {
-        $name = "{$attribute->name}Output";
-
-        return $this->types[$name] ??= new ObjectType([
-            'name' => $name,
-            'fields' => [
-                $fieldName => [
-                    'type' => $this->resolve($schemaName, $outputType, false)
-                ]
-            ],
-        ]);
+        $this->types["$schemaName.$name"] = $type;
     }
 
     public function resolveAttributeArgs(string $schemaName, Attribute $attribute, bool $input = false): array

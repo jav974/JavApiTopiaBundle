@@ -34,4 +34,9 @@ class Serializer
     {
         return $this->serializer->deserialize($data, $type, $format);
     }
+
+    public function normalize(object|array $data): array
+    {
+        return $this->serializer->normalize($data);
+    }
 }

@@ -19,7 +19,8 @@
   ],
   "require": {
     "php": "^8.1",
-    "nyholm/psr7": "^1.6",
+    "ivome/graphql-relay-php": "dev-master",
+    "nyholm/psr7": ">=1.6",
     "symfony/routing": ">=5.2",
     "symfony/dependency-injection": ">=5.2",
     "symfony/http-kernel": ">=5.2",
@@ -37,5 +38,8 @@
     "psr-4": {
       "Jav\\ApiTopiaBundle\\Tests\\": "tests/"
     }
-  }
+  },
+  "repositories": [
+    {"type":  "vcs", "url":  "git@github.com:otzy/graphql-relay-php.git"}
+  ]
 }

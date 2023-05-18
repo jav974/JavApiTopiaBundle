@@ -2,11 +2,13 @@
 
 namespace Jav\ApiTopiaBundle\GraphQL;
 
+use GraphQL\Type\Definition\NonNull;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Schema;
 use GraphQL\Utils\SchemaPrinter;
+use GraphQLRelay\Relay;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Mutation;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Query;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
@@ -78,15 +80,15 @@ class SchemaBuilder
     private function buildQueryObject(string $schemaName): ObjectType
     {
         $resources = $this->resourceLoader->getResources($schemaName) ?? [];
-        $fields = [];
+        $fields = [
+            'node' => $this->typeResolver->getNodeDefinition()['nodeField']
+        ];
 
         foreach ($resources as $className => $resource) {
-            /** @var \ReflectionAttribute[] $queries */
-            $attributes = array_merge($resource['queries'], $resource['query_collections']);
+            /** @var Query[]|QueryCollection[] $queries */
+            $queries = array_merge($resource['queries'], $resource['query_collections']);
 
-            foreach ($attributes as $attribute) {
-                /** @var Query|QueryCollection $query */
-                $query = $attribute->newInstance();
+            foreach ($queries as $query) {
                 $isCollection = $query instanceof QueryCollection;
                 $operationName = $query->name ?? $this->guessOperationName($resource['name'], $isCollection);
 
@@ -96,11 +98,14 @@ class SchemaBuilder
 
                 $outputType = $query->output ?? $className;
 
-                $fields[$operationName] = [
-                    'type' => $this->typeResolver->resolve($schemaName, $outputType, $isCollection),
-                    'args' => $this->typeResolver->resolveAttributeArgs($schemaName, $query),
-                    'resolve' => $this->resolverProvider->getResolveCallback($query),
-                ];
+                $fields[$operationName] = $this->typeResolver->getObjectTypeField(
+                    $schemaName,
+                    $outputType,
+                    $query->description,
+                    true,
+                    $query,
+                    $isCollection
+                );
             }
         }
 
@@ -116,12 +121,10 @@ class SchemaBuilder
         $fields = [];
 
         foreach ($resources as $className => $resource) {
-            /** @var \ReflectionAttribute[] $queries */
-            $attributes = $resource['mutations'];
+            /** @var Mutation[] $mutations */
+            $mutations = $resource['mutations'];
 
-            foreach ($attributes as $attribute) {
-                /** @var Mutation $mutation */
-                $mutation = $attribute->newInstance();
+            foreach ($mutations as $mutation) {
                 $operationName = $mutation->name;
 
                 if (isset($fields[$operationName])) {
@@ -129,20 +132,45 @@ class SchemaBuilder
                 }
 
                 $outputType = $mutation->output ?? $className;
+                $inputType = null;
 
                 if ($mutation->input) {
-                    $args = ['input' => ['type' => Type::nonNull($this->typeResolver->resolve($schemaName, $mutation->input, false, true))]];
+                    $inputType = Type::nonNull($this->typeResolver->resolve($schemaName, $mutation->input, false, true));
+                    $args = [];
                 } else {
-                    $args = ['input' => ['type' => Type::nonNull($this->typeResolver->resolveMutationAttributeArgs($schemaName, $mutation))]];
+                    $args = $this->typeResolver->resolveAttributeArgs($schemaName, $mutation, true);
                 }
 
-                $fieldName = lcfirst(substr($className, strrpos($className, '\\') + 1));
+                if (str_contains($className, '\\')) {
+                    $className = substr($className, strrpos($className, '\\') + 1);
+                }
 
-                $fields[$operationName] = [
-                    'type' => Type::nonNull($this->typeResolver->resolveMutationOutput($schemaName, $fieldName, $outputType, $mutation)),
-                    'args' => $args,
-                    'resolve' => $this->resolverProvider->getResolveCallback($mutation, $fieldName),
-                ];
+                $fieldName = lcfirst($className);
+
+                $mutationData = Relay::mutationWithClientMutationId([
+                    'name' => $operationName,
+                    'inputFields' => $args,
+                    'outputFields' => [
+                        $fieldName => [
+                            'type' => $this->typeResolver->resolve($schemaName, $outputType, false),
+                            'resolve' => fn ($payload) => $payload
+                        ]
+                    ],
+                    'mutateAndGetPayload' => $this->resolverProvider->getResolveCallback($mutation),
+                ]);
+
+                if ($inputType) {
+                    $mutationData['args']['input']['type'] = $inputType;
+                }
+
+                /** @var NonNull $inputType */
+                $inputType = $mutationData['args']['input']['type'];
+                $inputType = $inputType->getWrappedType();
+
+                $this->typeResolver->setType($schemaName, $inputType->name, $inputType);
+                $this->typeResolver->setType($schemaName, $mutationData['type']->name, $mutationData['type']);
+
+                $fields[$operationName] = $mutationData;
             }
         }
 

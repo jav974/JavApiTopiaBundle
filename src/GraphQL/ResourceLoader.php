@@ -2,6 +2,7 @@
 
 namespace Jav\ApiTopiaBundle\GraphQL;
 
+use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Mutation;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Query;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
@@ -28,13 +29,17 @@ class ResourceLoader
 
                 try {
                     $reflectionClass = new \ReflectionClass($classPath);
+                    /** @var ApiResource|null $apiResource */
+                    $apiResource = ($reflectionClass->getAttributes(ApiResource::class)[0] ?? null)?->newInstance();
+                    $queries = array_filter($apiResource?->queries ?? [], fn($query) => !$query instanceof QueryCollection);
+                    $queryCollections = array_filter($apiResource?->queries ?? [], fn($query) => $query instanceof QueryCollection);
 
                     $this->resources[$schemaName][$classPath] = [
                         'name' => $className,
-                        'queries' => $reflectionClass->getAttributes(Query::class),
-                        'query_collections' => $reflectionClass->getAttributes(QueryCollection::class),
-                        'mutations' => $reflectionClass->getAttributes(Mutation::class),
-                        'subscriptions' => [],
+                        'queries' => $queries,
+                        'query_collections' => $queryCollections,
+                        'mutations' => $apiResource?->mutations ?? [],
+                        'subscriptions' => $apiResource?->subscriptions ?? [],
                         'reflection' => $reflectionClass
                     ];
                 } catch (\ReflectionException) {
