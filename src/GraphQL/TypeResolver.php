@@ -3,16 +3,16 @@
 namespace Jav\ApiTopiaBundle\GraphQL;
 
 use GraphQL\Type\Definition\InputObjectType;
-use GraphQL\Type\Definition\ListOfType;
-use GraphQL\Type\Definition\NonNull;
 use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type;
+use GraphQL\Type\Definition\WrappingType;
 use GraphQLRelay\Connection\Connection;
 use GraphQLRelay\Relay;
+use InvalidArgumentException;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
-use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQueryCollection;
+use ReflectionClass;
 use RuntimeException;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 
@@ -46,13 +46,9 @@ class TypeResolver
         return $this->nodeDefinition;
     }
 
-    public function resolve(string $schemaName, string $classPath, bool $isCollection, bool $input = false): Type
+    public function resolve(string $schemaName, string $classPath, bool $isCollection, bool $input = false): Type&NullableType
     {
-        if (str_contains($classPath, '\\')) {
-            $typeName = substr($classPath, strrpos($classPath, '\\') + 1);
-        } else {
-            $typeName = $classPath;
-        }
+        $typeName = ReflectionUtils::getClassNameFromClassPath($classPath);
 
         if (in_array($typeName, ['int', 'float', 'string', 'boolean', 'bool', 'ID'])) {
             $typeName = $typeName === 'bool' ? 'boolean' : $typeName;
@@ -76,7 +72,7 @@ class TypeResolver
         return $type;
     }
 
-    public function getType(string $name, ?string $schemaName = null): Type
+    public function getType(string $name, ?string $schemaName = null): Type&NullableType
     {
         if (isset($this->types[$name])) {
             return $this->types[$name];
@@ -86,10 +82,10 @@ class TypeResolver
             $name = "$schemaName.$name";
         }
 
-        return $this->types[$name] ?? throw new \InvalidArgumentException(sprintf('Type "%s" not found.', $name));
+        return $this->types[$name] ?? throw new InvalidArgumentException(sprintf('Type "%s" not found.', $name));
     }
 
-    private function createType(string $schemaName, string $classPath, bool $input = false): Type
+    private function createType(string $schemaName, string $classPath, bool $input = false): Type&NullableType
     {
         $reflectionClass = $this->resourceLoader->getReflectionClass($schemaName, $classPath);
 
@@ -103,12 +99,7 @@ class TypeResolver
     public function getObjectTypeField(string $schemaName, string $classPath, ?string $comment, bool $allowsNull, ?Attribute $attribute, bool $isCollection): array
     {
         $field = [];
-        $outputClassName = str_replace('[]', '', $classPath);
-
-        if (str_contains($outputClassName, '\\')) {
-            $outputClassName = substr($outputClassName, strrpos($outputClassName, '\\') + 1);
-        }
-
+        $outputClassName = ReflectionUtils::getClassNameFromClassPath($classPath);
         $type = $this->resolveTypeFromSchema($outputClassName, $schemaName);
         $type = $this->resolve($schemaName, $type, $isCollection);
 
@@ -135,15 +126,13 @@ class TypeResolver
         return $field;
     }
 
-    private function createObjectType(string $schemaName, \ReflectionClass $reflectionClass): ObjectType
+    private function createObjectType(string $schemaName, ReflectionClass $reflectionClass): ObjectType
     {
         // If it is an ApiResource, make it available in the schema with Relay specification
         $isNodeInterface = (bool)($reflectionClass->getAttributes(ApiResource::class)[0] ?? null);
-
-        $description = TypeUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null);
         $objectTypeData = [
             'name' => $reflectionClass->getShortName(),
-            'description' => $description,
+            'description' => ReflectionUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null),
             'fields' => function () use ($reflectionClass, $schemaName, $isNodeInterface) {
                 $fields = [];
 
@@ -152,14 +141,8 @@ class TypeResolver
                 }
 
                 foreach ($reflectionClass->getProperties() as $reflectionProperty) {
-                    $queryCollectionAttribute = $reflectionProperty->getAttributes(SubQueryCollection::class)[0] ?? null;
-                    $comment = $reflectionProperty->getDocComment() ?: null;
-                    /** @var QueryCollection $queryCollection */
-                    $queryCollection = $queryCollectionAttribute?->newInstance();
-                    $type = $reflectionProperty->getType()?->getName();
-                    $isCollection = in_array($type ?? '', ['iterable', 'array']);
-                    $type = $isCollection ? $queryCollection?->output ?? TypeUtils::getTypeFromDocComment($comment) : $type;
-                    $propertyName = $reflectionProperty->getName();
+                    $fieldInfo = ReflectionUtils::extractFieldInfoFromProperty($reflectionProperty);
+                    $propertyName = $fieldInfo['name'];
 
                     if ($propertyName === 'id' && $isNodeInterface) {
                         $propertyName = '_id';
@@ -167,11 +150,11 @@ class TypeResolver
 
                     $fields[$propertyName] = $this->getObjectTypeField(
                         $schemaName,
-                        $type,
-                        TypeUtils::getDescriptionFromDocComment($comment),
-                        $reflectionProperty->getType()?->allowsNull() ?? true,
-                        $queryCollection,
-                        $isCollection
+                        $fieldInfo['type'],
+                        $fieldInfo['description'],
+                        $fieldInfo['allowsNull'],
+                        $fieldInfo['queryCollection'],
+                        $fieldInfo['isCollection']
                     );
                 }
 
@@ -190,50 +173,37 @@ class TypeResolver
         return $type;
     }
 
-    private function getRelayConnection(string $schemaName, string $outputClassName, Type $type)
+    private function getRelayConnection(string $schemaName, string $outputClassName, Type $type): ObjectType
     {
-        if ($type instanceof NonNull || $type instanceof ListOfType) {
+        if ($type instanceof WrappingType) {
             $type = $type->getInnerMostType();
         }
 
         $edgeName = $outputClassName . 'Edge';
         $connectionName = $outputClassName . 'CursorConnection';
 
-        if (isset($this->types["$schemaName.$edgeName"])) {
-            $edge = $this->types["$schemaName.$edgeName"];
-        } else {
-            $edge = Relay::edgeType([
-                'nodeType' => $type,
-                'name' => $outputClassName,
-            ]);
-            $this->types["$schemaName.$edgeName"] = $edge;
-        }
+        $edge = $this->types["$schemaName.$edgeName"] ??= Relay::edgeType([
+            'nodeType' => $type,
+            'name' => $outputClassName,
+        ]);
 
-        if (isset($this->types["$schemaName.$connectionName"])) {
-            $connection = $this->types["$schemaName.$connectionName"];
-        } else {
-            $connection = Relay::connectionType([
-                'nodeType' => $type,
-                'edgeType' => $edge,
-                'connectionFields' => [
-                    'totalCount' => [
-                        'type' => Type::nonNull(Type::int()),
-                        'description' => 'The total count of items in the connection.',
-                        'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
-                    ],
+        return $this->types["$schemaName.$connectionName"] ??= Relay::connectionType([
+            'nodeType' => $type,
+            'edgeType' => $edge,
+            'connectionFields' => [
+                'totalCount' => [
+                    'type' => Type::nonNull(Type::int()),
+                    'description' => 'The total count of items in the connection.',
+                    'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
                 ],
-                'name' => $outputClassName . 'Cursor'
-            ]);
-
-            $this->types["$schemaName.$connectionName"] = $connection;
-        }
-
-        return $connection;
+            ],
+            'name' => $outputClassName . 'Cursor'
+        ]);
     }
 
-    private function createInputType(string $schemaName, \ReflectionClass $reflectionClass): InputObjectType
+    private function createInputType(string $schemaName, ReflectionClass $reflectionClass): InputObjectType
     {
-        $description = TypeUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null);
+        $description = ReflectionUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null);
 
         $type = new InputObjectType([
             'name' => $reflectionClass->getShortName(),
@@ -242,22 +212,12 @@ class TypeResolver
                 $fields = [];
 
                 foreach ($reflectionClass->getProperties() as $reflectionProperty) {
-                    $comment = $reflectionProperty->getDocComment() ?: null;
-                    $type = $reflectionProperty->getType()?->getName();
-                    $type = TypeUtils::getTypeFromDocComment($comment) ?: $type;
-                    $type = $this->resolveTypeFromSchema($type, $schemaName);
-                    $allowsNull = $reflectionProperty->getType()?->allowsNull() ?? true;
+                    $fieldInfo = ReflectionUtils::extractFieldInfoFromProperty($reflectionProperty);
+                    $type = $this->resolveTypeFromSchema($fieldInfo['type'], $schemaName);
                     $type = $this->resolve($schemaName, $type, false, !$reflectionProperty->getType()?->isBuiltin());
-
-                    if (!$allowsNull) {
-                        $type = Type::nonNull($type);
-                    }
-
-                    $propertyName = $reflectionProperty->getName();
-
-                    $fields[$propertyName] = [
-                        'type' => $type,
-                        'description' => TypeUtils::getDescriptionFromDocComment($comment),
+                    $fields[$reflectionProperty->getName()] = [
+                        'type' => $fieldInfo['allowsNull'] ? $type : Type::nonNull($type),
+                        'description' => $fieldInfo['description'],
                     ];
                 }
 
@@ -313,14 +273,11 @@ class TypeResolver
         return $args;
     }
 
-    private function resolveTypeFromSchema(?string $type, string $schemaName)
+    private function resolveTypeFromSchema(?string $type, string $schemaName): ?string
     {
         if (!$type) {
             return null;
         }
-
-        preg_match('/([a-zA-Z0-9\\\]+)/', $type, $matches);
-        $type = $matches[1];
 
         $reflectionClass = $this->resourceLoader->getReflectionClass($schemaName, $type);
 

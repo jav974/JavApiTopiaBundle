@@ -2,16 +2,20 @@
 
 namespace Jav\ApiTopiaBundle\GraphQL;
 
-use GraphQL\Type\Definition\NonNull;
+use GraphQL\Error\Error;
+use GraphQL\Error\SerializationError;
 use GraphQL\Type\Definition\ObjectType;
-use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Schema;
 use GraphQL\Utils\SchemaPrinter;
 use GraphQLRelay\Relay;
+use InvalidArgumentException;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Mutation;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Query;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
+use JsonException;
+use RuntimeException;
+use Throwable;
 
 class SchemaBuilder
 {
@@ -27,6 +31,9 @@ class SchemaBuilder
     ) {
     }
 
+    /**
+     * @throws Error|SerializationError|JsonException|Throwable
+     */
     public function build(): void
     {
         foreach ($this->config as $schemaName => $config) {
@@ -47,7 +54,7 @@ class SchemaBuilder
         }
 
         if (!isset($this->config[$schemaName])) {
-            throw new \InvalidArgumentException(sprintf('Schema "%s" not found.', $schemaName));
+            throw new InvalidArgumentException(sprintf('Schema "%s" not found.', $schemaName));
         }
 
         return $this->schemas[$schemaName] = $this->buildSchema($schemaName, $this->config[$schemaName]);
@@ -84,7 +91,7 @@ class SchemaBuilder
             'node' => $this->typeResolver->getNodeDefinition()['nodeField']
         ];
 
-        foreach ($resources as $className => $resource) {
+        foreach ($resources as $classPath => $resource) {
             /** @var Query[]|QueryCollection[] $queries */
             $queries = array_merge($resource['queries'], $resource['query_collections']);
 
@@ -93,10 +100,10 @@ class SchemaBuilder
                 $operationName = $query->name ?? $this->guessOperationName($resource['name'], $isCollection);
 
                 if (isset($fields[$operationName])) {
-                    throw new \RuntimeException(sprintf('Duplicate operation name "%s" in schema "%s"', $operationName, $schemaName));
+                    throw new RuntimeException(sprintf('Duplicate operation name "%s" in Query schema "%s"', $operationName, $schemaName));
                 }
 
-                $outputType = $query->output ?? $className;
+                $outputType = $query->output ?? $classPath;
 
                 $fields[$operationName] = $this->typeResolver->getObjectTypeField(
                     $schemaName,
@@ -120,7 +127,7 @@ class SchemaBuilder
         $resources = $this->resourceLoader->getResources($schemaName) ?? [];
         $fields = [];
 
-        foreach ($resources as $className => $resource) {
+        foreach ($resources as $classPath => $resource) {
             /** @var Mutation[] $mutations */
             $mutations = $resource['mutations'];
 
@@ -128,28 +135,14 @@ class SchemaBuilder
                 $operationName = $mutation->name;
 
                 if (isset($fields[$operationName])) {
-                    throw new \RuntimeException(sprintf('Duplicate operation name "%s" in schema "%s"', $operationName, $schemaName));
+                    throw new RuntimeException(sprintf('Duplicate operation name "%s" in Mutation schema "%s"', $operationName, $schemaName));
                 }
 
-                $outputType = $mutation->output ?? $className;
-                $inputType = null;
-
-                if ($mutation->input) {
-                    $inputType = Type::nonNull($this->typeResolver->resolve($schemaName, $mutation->input, false, true));
-                    $args = [];
-                } else {
-                    $args = $this->typeResolver->resolveAttributeArgs($schemaName, $mutation, true);
-                }
-
-                if (str_contains($className, '\\')) {
-                    $className = substr($className, strrpos($className, '\\') + 1);
-                }
-
-                $fieldName = lcfirst($className);
-
+                $outputType = $mutation->output ?? $classPath;
+                $fieldName = lcfirst(ReflectionUtils::getClassNameFromClassPath($classPath));
                 $mutationData = Relay::mutationWithClientMutationId([
                     'name' => $operationName,
-                    'inputFields' => $args,
+                    'inputFields' => $mutation->input ? [] : $this->typeResolver->resolveAttributeArgs($schemaName, $mutation, true),
                     'outputFields' => [
                         $fieldName => [
                             'type' => $this->typeResolver->resolve($schemaName, $outputType, false),
@@ -159,13 +152,12 @@ class SchemaBuilder
                     'mutateAndGetPayload' => $this->resolverProvider->getResolveCallback($mutation),
                 ]);
 
-                if ($inputType) {
-                    $mutationData['args']['input']['type'] = $inputType;
+                if ($mutation->input) {
+                    $mutationData['args']['input']['type'] = Type::nonNull($this->typeResolver->resolve($schemaName, $mutation->input, false, true));
                 }
 
-                /** @var NonNull $inputType */
-                $inputType = $mutationData['args']['input']['type'];
-                $inputType = $inputType->getWrappedType();
+                /** @var Type $inputType */
+                $inputType = $mutationData['args']['input']['type']->getWrappedType();
 
                 $this->typeResolver->setType($schemaName, $inputType->name, $inputType);
                 $this->typeResolver->setType($schemaName, $mutationData['type']->name, $mutationData['type']);
