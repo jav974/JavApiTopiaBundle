@@ -7,6 +7,7 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\MutationResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
 use Jav\ApiTopiaBundle\Api\ResolverInterface;
+use Jav\ApiTopiaBundle\Controller\GraphiQLController;
 use Jav\ApiTopiaBundle\GraphQL\ResolverProvider;
 use Jav\ApiTopiaBundle\GraphQL\ResourceLoader;
 use Jav\ApiTopiaBundle\GraphQL\SchemaBuilder;
@@ -57,6 +58,10 @@ class ApiTopiaExtension extends ConfigurableExtension
 
         $container->getDefinition(RouteLoader::class)
             ->addMethodCall('setGraphQLEndpoints', [$graphQLEndpoints])
+        ;
+
+        $container->getDefinition(GraphiQLController::class)
+            ->setArgument('$endpoints', $graphQLEndpoints)
         ;
     }
 }

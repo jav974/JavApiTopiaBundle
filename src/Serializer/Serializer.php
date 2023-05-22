@@ -4,6 +4,7 @@
 namespace Jav\ApiTopiaBundle\Serializer;
 
 
+use ArrayObject;
 use Psr\Http\Message\UploadedFileInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
@@ -39,10 +40,10 @@ class Serializer
 
     /**
      * @param object|array<mixed>|null $data
-     * @return array<mixed>|string|int|float|bool|\ArrayObject<string, mixed>|null
+     * @return array<mixed>|string|int|float|bool|ArrayObject<string, mixed>|null
      * @throws ExceptionInterface
      */
-    public function normalize(object|array|null $data): array|string|int|float|bool|\ArrayObject|null
+    public function normalize(object|array|null $data): array|string|int|float|bool|ArrayObject|null
     {
         return $this->serializer->normalize($data);
     }
@@ -59,6 +60,7 @@ class Serializer
 
     /**
      * @param array<mixed> $data
+     * @throws ExceptionInterface
      */
     public function denormalizeUploadedFiles(array &$data): void
     {

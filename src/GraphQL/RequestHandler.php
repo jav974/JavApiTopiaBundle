@@ -31,6 +31,7 @@ class RequestHandler
             $psrRequest = match ($contentType) {
                 'application/graphql' => $this->handleApplicationGraphql($psrRequest),
                 'multipart/form-data' => $this->handleMultipartFormData($psrRequest),
+                'application/json' => $this->handleApplicationJson($psrRequest),
                 default => $psrRequest,
             };
 
@@ -62,5 +63,10 @@ class RequestHandler
     private function handleMultipartFormData(ServerRequestInterface $request): ServerRequestInterface
     {
         return (new UploadMiddleware())->processRequest($request);
+    }
+
+    private function handleApplicationJson(ServerRequestInterface $request): ServerRequestInterface
+    {
+        return $request->withParsedBody(json_decode($request->getBody()->getContents(), true, JSON_THROW_ON_ERROR));
     }
 }

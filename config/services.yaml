@@ -20,8 +20,14 @@ services:
         tags: [ console.command ]
 
     Jav\ApiTopiaBundle\Serializer\Serializer: ~
-    Jav\ApiTopiaBundle\Serializer\UploadedFileNormalizer:
+    Jav\ApiTopiaBundle\Serializer\UploadedFileDenormalizer:
         tags: [ serializer.normalizer ]
+
+    Jav\ApiTopiaBundle\Controller\:
+        resource: '../src/Controller/'
+        autowire: true
+        autoconfigure: true
+        tags: [ 'controller.service_arguments' ]
 
     Jav\ApiTopiaBundle\GraphQL\SchemaBuilder: ~
     Jav\ApiTopiaBundle\GraphQL\ResourceLoader: ~

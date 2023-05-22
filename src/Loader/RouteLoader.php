@@ -43,6 +43,7 @@ class RouteLoader extends Loader
 
         $this->loadRestRoutes($routes);
         $this->loadGraphQLEndpoints($routes);
+        $this->loadGraphiQLEndpoint($routes);
         $this->isLoaded = true;
 
         return $routes;
@@ -59,6 +60,13 @@ class RouteLoader extends Loader
                 ]
             ], methods: ['POST']));
         }
+    }
+
+    private function loadGraphiQLEndpoint(RouteCollection $routes): void
+    {
+        $routes->add('apitopia_graphiql', new Route('/api/graphiql/{schema}', [
+            '_controller' => 'Jav\ApiTopiaBundle\Controller\GraphiQLController::index',
+        ], methods: ['GET', 'POST']));
     }
 
     private function loadRestRoutes(RouteCollection $routes): void
