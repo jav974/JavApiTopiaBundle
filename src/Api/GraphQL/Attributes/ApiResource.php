@@ -8,10 +8,10 @@ class ApiResource
     /**
      * @param string|null $name The name of the resource (defaults to the class name if omitted)
      * @param string|null $description The description of the resource
-     * @param array|Query[]|QueryCollection[] $queries The queries to expose to Query object schema
-     * @param array|Mutation[] $mutations The mutations to expose to Mutation object schema
-     * @param array $subscriptions The subscriptions to expose to Subscription object schema
-     * @param array|Attribute[] $graphQLOperations All queries, mutations and subscriptions to expose to the schema (for compatibility with ApiPlatform way of defining GraphQL operations)
+     * @param Query[]|QueryCollection[] $queries The queries to expose to Query object schema
+     * @param Mutation[] $mutations The mutations to expose to Mutation object schema
+     * @param array<mixed> $subscriptions The subscriptions to expose to Subscription object schema
+     * @param Attribute[] $graphQLOperations All queries, mutations and subscriptions to expose to the schema (for compatibility with ApiPlatform way of defining GraphQL operations)
      */
     public function __construct(
         public ?string $name = null,

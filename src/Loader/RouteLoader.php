@@ -14,19 +14,26 @@ class RouteLoader extends Loader
     /** @var string[] */
     private array $resolvers = [];
 
+    /** @var string[] */
     private array $graphQLEndpoints = [];
 
+    /**
+     * @param string[] $resolvers
+     */
     public function setResolvers(array $resolvers): void
     {
         $this->resolvers = $resolvers;
     }
 
+    /**
+     * @param string[] $endpoints
+     */
     public function setGraphQLEndpoints(array $endpoints): void
     {
         $this->graphQLEndpoints = $endpoints;
     }
 
-    public function load($resource, string $type = null): RouteCollection
+    public function load(mixed $resource, string $type = null): RouteCollection
     {
         if ($this->isLoaded) {
             throw new \RuntimeException('Do not add the "apitopia" loader twice');

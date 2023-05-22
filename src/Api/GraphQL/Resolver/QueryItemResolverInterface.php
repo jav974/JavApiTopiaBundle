@@ -4,5 +4,9 @@ namespace Jav\ApiTopiaBundle\Api\GraphQL\Resolver;
 
 interface QueryItemResolverInterface
 {
-    public function __invoke(array $context);
+    /**
+     * @param array<string, mixed> $context
+     * @return object|array<mixed>|null
+     */
+    public function __invoke(array $context): object|array|null;
 }

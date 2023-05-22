@@ -8,6 +8,9 @@ class QueryCollection extends Query
     public const PAGINATION_TYPE_CURSOR = 'cursor';
     public const PAGINATION_TYPE_OFFSET = 'offset';
 
+    /**
+     * @param array<string, array<string, string>>|null $args
+     */
     public function __construct(
         string $resolver,
         public bool $paginationEnabled = true,

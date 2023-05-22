@@ -4,6 +4,7 @@ namespace Jav\ApiTopiaBundle\GraphQL;
 
 use GraphQL\Error\Error;
 use GraphQL\Error\SerializationError;
+use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Schema;
@@ -19,9 +20,12 @@ use Throwable;
 
 class SchemaBuilder
 {
-    /** @var Schema[] */
+    /** @var array<string, Schema> */
     private array $schemas = [];
 
+    /**
+     * @param array<string, mixed> $config
+     */
     public function __construct(
         private readonly array $config,
         private readonly string $schemaOutputDirectory,
@@ -60,6 +64,9 @@ class SchemaBuilder
         return $this->schemas[$schemaName] = $this->buildSchema($schemaName, $this->config[$schemaName]);
     }
 
+    /**
+     * @param array<string, mixed> $config
+     */
     private function buildSchema(string $schemaName, array $config): Schema
     {
         // Extract Query, QueryCollection, Mutation and Subscription attributes from DTO class definitions
@@ -86,7 +93,7 @@ class SchemaBuilder
 
     private function buildQueryObject(string $schemaName): ObjectType
     {
-        $resources = $this->resourceLoader->getResources($schemaName) ?? [];
+        $resources = $this->resourceLoader->getResources($schemaName);
         $fields = [
             'node' => $this->typeResolver->getNodeDefinition()['nodeField']
         ];
@@ -124,7 +131,7 @@ class SchemaBuilder
 
     private function buildMutationObject(string $schemaName): ObjectType
     {
-        $resources = $this->resourceLoader->getResources($schemaName) ?? [];
+        $resources = $this->resourceLoader->getResources($schemaName);
         $fields = [];
 
         foreach ($resources as $classPath => $resource) {
@@ -156,8 +163,12 @@ class SchemaBuilder
                     $mutationData['args']['input']['type'] = Type::nonNull($this->typeResolver->resolve($schemaName, $mutation->input, false, true));
                 }
 
-                /** @var Type $inputType */
+                /** @var Type&NullableType $inputType */
                 $inputType = $mutationData['args']['input']['type']->getWrappedType();
+
+                if (!isset($inputType->name)) {
+                    throw new InvalidArgumentException("No name found for input type");
+                }
 
                 $this->typeResolver->setType($schemaName, $inputType->name, $inputType);
                 $this->typeResolver->setType($schemaName, $mutationData['type']->name, $mutationData['type']);

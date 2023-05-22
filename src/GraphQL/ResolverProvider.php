@@ -31,19 +31,24 @@ class ResolverProvider
     public function getResolveCallback(Attribute $attribute): \Closure
     {
         if ($attribute instanceof Mutation) {
-            return function ($input, $context, ResolveInfo $resolveInfo) use ($attribute) {
-                $resolver = $this->getResolver($attribute->resolver);
+            return function (array $input, $context, ResolveInfo $resolveInfo) use ($attribute) {
                 $context = $context ?? [];
                 $context['info'] = $resolveInfo;
+
+                $this->serializer->denormalizeUploadedFiles($input);
+
+                if ($attribute->deserialize && $attribute->input) {
+                    $input = $this->serializer->denormalize($input, $attribute->input);
+                }
+
                 $context['args']['input'] = $input;
 
-                $data = $resolver($context);
+                $data = $this->execResolver($attribute, $context);
                 return $this->normalizeData($data);
             };
         }
 
         return function($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute) {
-            $resolver = $this->getResolver($attribute->resolver);
             $context = $context ?? [];
             $context['info'] = $resolveInfo;
             $context['root'] = $root;
@@ -52,7 +57,7 @@ class ResolverProvider
                 $context['args'] = $args;
             }
 
-            $data = $resolver($context);
+            $data = $this->execResolver($attribute, $context);
 
             if ($attribute instanceof QueryCollection) {
                 $normalizedData = $this->normalizeData($data);
@@ -66,7 +71,15 @@ class ResolverProvider
         };
     }
 
-    private function normalizeData($data): array
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function execResolver(Attribute $attribute, array $context): mixed
+    {
+        return $this->getResolver($attribute->resolver)($context);
+    }
+
+    private function normalizeData(mixed $data): mixed
     {
         if (is_iterable($data)) {
             $normalizedData = [];

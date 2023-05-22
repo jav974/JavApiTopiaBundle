@@ -5,6 +5,9 @@ namespace Jav\ApiTopiaBundle\Api\GraphQL\Attributes;
 #[\Attribute(\Attribute::TARGET_PROPERTY)]
 class SubQueryCollection extends QueryCollection
 {
+    /**
+     * @param array<string, array<string, string>>|null $args
+     */
     public function __construct(
         string $resolver,
         bool $paginationEnabled = true,

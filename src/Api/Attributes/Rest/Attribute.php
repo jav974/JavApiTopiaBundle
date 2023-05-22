@@ -5,7 +5,6 @@ namespace Jav\ApiTopiaBundle\Api\Attributes\Rest;
 
 use Jav\ApiTopiaBundle\Api\Attributes\Attribute as BaseAttribute;
 
-#[\Attribute]
 abstract class Attribute extends BaseAttribute
 {
     const METHOD_GET = 'GET';

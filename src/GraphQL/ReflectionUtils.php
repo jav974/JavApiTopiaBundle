@@ -4,25 +4,27 @@ namespace Jav\ApiTopiaBundle\GraphQL;
 
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQueryCollection;
-use JetBrains\PhpStorm\ArrayShape;
+use ReflectionNamedType;
+use ReflectionProperty;
 
 class ReflectionUtils
 {
-    #[ArrayShape([
-        'name' => "string",
-        'description' => "string|null",
-        'type' => "string|null",
-        'isCollection' => "bool",
-        'queryCollection' => "QueryCollection|null",
-        'allowsNull' => "bool"
-    ])]
-    public static function extractFieldInfoFromProperty(\ReflectionProperty $reflectionProperty): array
+    /**
+     * @return array<string, mixed>
+     */
+    public static function extractFieldInfoFromProperty(ReflectionProperty $reflectionProperty): array
     {
         $queryCollectionAttribute = $reflectionProperty->getAttributes(SubQueryCollection::class)[0] ?? null;
         $comment = $reflectionProperty->getDocComment() ?: null;
         /** @var QueryCollection|null $queryCollection */
         $queryCollection = $queryCollectionAttribute?->newInstance();
-        $type = $reflectionProperty->getType()?->getName();
+        $reflectionType = $reflectionProperty->getType();
+        $type = null;
+
+        if ($reflectionType instanceof ReflectionNamedType) {
+            $type = $reflectionType->getName();
+        }
+
         $isCollection = in_array($type ?? '', ['iterable', 'array']);
         $docCommentType = self::getTypeFromDocComment($comment);
         $isCollection = $isCollection || str_contains($docCommentType ?? '', '[]');
@@ -36,7 +38,8 @@ class ReflectionUtils
             'type' => $type,
             'isCollection' => $isCollection,
             'queryCollection' => $queryCollection,
-            'allowsNull' => $reflectionProperty->getType()?->allowsNull() ?? true
+            'allowsNull' => $reflectionType?->allowsNull() ?? true,
+            'isBuiltin' => $reflectionType instanceof ReflectionNamedType && $reflectionType->isBuiltin(),
         ];
     }
 

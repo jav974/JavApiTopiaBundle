@@ -6,6 +6,9 @@ use Jav\ApiTopiaBundle\Api\Attributes\Attribute as BaseAttribute;
 
 abstract class Attribute extends BaseAttribute
 {
+    /**
+     * @param array<string, array<string, string>>|null $args
+     */
     public function __construct(public string $resolver, ?string $output = null, ?string $name = null, ?string $description = null, public ?array $args = null)
     {
         parent::__construct($output, $name, $description);

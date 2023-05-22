@@ -7,6 +7,7 @@ use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Definition\WrappingType;
+use GraphQL\Upload\UploadType;
 use GraphQLRelay\Connection\Connection;
 use GraphQLRelay\Relay;
 use InvalidArgumentException;
@@ -15,10 +16,13 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
 use ReflectionClass;
 use RuntimeException;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class TypeResolver
 {
+    /** @var array<string, Type&NullableType> */
     private array $types;
+    /** @var array<string, Type&NullableType>  */
     private array $nodeDefinition;
 
     public function __construct(
@@ -39,8 +43,12 @@ class TypeResolver
         );
         $this->types['Node'] = $this->nodeDefinition['nodeInterface'];
         $this->types['PageInfo'] = Connection::pageInfoType();
+        $this->types['Upload'] = new UploadType();
     }
 
+    /**
+     * @return array<string, Type&NullableType>
+     */
     public function getNodeDefinition(): array
     {
         return $this->nodeDefinition;
@@ -48,6 +56,10 @@ class TypeResolver
 
     public function resolve(string $schemaName, string $classPath, bool $isCollection, bool $input = false): Type&NullableType
     {
+        if ($classPath === UploadedFile::class) {
+            return $this->types['Upload'] ??= new UploadType();
+        }
+
         $typeName = ReflectionUtils::getClassNameFromClassPath($classPath);
 
         if (in_array($typeName, ['int', 'float', 'string', 'boolean', 'bool', 'ID'])) {
@@ -96,6 +108,9 @@ class TypeResolver
         return $input ? $this->createInputType($schemaName, $reflectionClass) : $this->createObjectType($schemaName, $reflectionClass);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getObjectTypeField(string $schemaName, string $classPath, ?string $comment, bool $allowsNull, ?Attribute $attribute, bool $isCollection): array
     {
         $field = [];
@@ -126,6 +141,9 @@ class TypeResolver
         return $field;
     }
 
+    /**
+     * @param ReflectionClass<object> $reflectionClass
+     */
     private function createObjectType(string $schemaName, ReflectionClass $reflectionClass): ObjectType
     {
         // If it is an ApiResource, make it available in the schema with Relay specification
@@ -187,6 +205,7 @@ class TypeResolver
             'name' => $outputClassName,
         ]);
 
+        // @phpstan-ignore-next-line
         return $this->types["$schemaName.$connectionName"] ??= Relay::connectionType([
             'nodeType' => $type,
             'edgeType' => $edge,
@@ -201,6 +220,9 @@ class TypeResolver
         ]);
     }
 
+    /**
+     * @param ReflectionClass<object> $reflectionClass
+     */
     private function createInputType(string $schemaName, ReflectionClass $reflectionClass): InputObjectType
     {
         $description = ReflectionUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null);
@@ -214,7 +236,7 @@ class TypeResolver
                 foreach ($reflectionClass->getProperties() as $reflectionProperty) {
                     $fieldInfo = ReflectionUtils::extractFieldInfoFromProperty($reflectionProperty);
                     $type = $this->resolveTypeFromSchema($fieldInfo['type'], $schemaName);
-                    $type = $this->resolve($schemaName, $type, false, !$reflectionProperty->getType()?->isBuiltin());
+                    $type = $this->resolve($schemaName, $type, false, !$fieldInfo['isBuiltin']);
                     $fields[$reflectionProperty->getName()] = [
                         'type' => $fieldInfo['allowsNull'] ? $type : Type::nonNull($type),
                         'description' => $fieldInfo['description'],
@@ -230,11 +252,14 @@ class TypeResolver
         return $type;
     }
 
-    public function setType(string $schemaName, string $name, Type $type): void
+    public function setType(string $schemaName, string $name, Type&NullableType $type): void
     {
         $this->types["$schemaName.$name"] = $type;
     }
 
+    /**
+     * @return array<string, array<string, mixed>>
+     */
     public function resolveAttributeArgs(string $schemaName, Attribute $attribute, bool $input = false): array
     {
         $args = [];

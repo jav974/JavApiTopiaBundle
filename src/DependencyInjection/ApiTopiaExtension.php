@@ -2,6 +2,7 @@
 
 namespace Jav\ApiTopiaBundle\DependencyInjection;
 
+use Exception;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\MutationResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
@@ -18,7 +19,10 @@ use Symfony\Component\HttpKernel\DependencyInjection\ConfigurableExtension;
 
 class ApiTopiaExtension extends ConfigurableExtension
 {
-
+    /**
+     * @param array<string, mixed> $mergedConfig
+     * @throws Exception
+     */
     protected function loadInternal(array $mergedConfig, ContainerBuilder $container): void
     {
         $container->registerForAutoconfiguration(ResolverInterface::class)

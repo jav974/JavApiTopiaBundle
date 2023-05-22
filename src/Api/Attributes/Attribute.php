@@ -3,7 +3,6 @@
 
 namespace Jav\ApiTopiaBundle\Api\Attributes;
 
-#[\Attribute]
 abstract class Attribute
 {
     /**
