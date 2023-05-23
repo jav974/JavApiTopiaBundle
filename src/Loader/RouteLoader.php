@@ -82,7 +82,7 @@ class RouteLoader extends Loader
                     $attributeInstance = $attribute->newInstance();
 
                     $route = new Route($attributeInstance->path, [
-                        '_controller' => 'Jav\ApiTopiaBundle\Rest\ResponseHandler::handleResponse',
+                        '_controller' => 'Jav\ApiTopiaBundle\Rest\RequestHandler::handleResponse',
                         '_apitopia' => [
                             'attr' => serialize($attributeInstance),
                             'resolver' => [

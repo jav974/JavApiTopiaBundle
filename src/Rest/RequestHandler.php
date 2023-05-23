@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Jav\ApiTopiaBundle\Rest;
-
 
 use Exception;
 use Jav\ApiTopiaBundle\Api\Attributes\Rest\Attribute;
@@ -15,7 +13,7 @@ use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class ResponseHandler
+class RequestHandler
 {
     private ServiceLocator $locator;
     private Serializer $serializer;
