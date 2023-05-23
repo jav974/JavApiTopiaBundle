@@ -2,17 +2,31 @@
 
 namespace Jav\ApiTopiaBundle\GraphQL;
 
+use Doctrine\Common\Annotations\AnnotationReader;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
-use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Mutation;
-use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Query;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 use ReflectionClass;
 use Symfony\Component\Finder\Finder;
+use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactory;
+use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactoryInterface;
+use Symfony\Component\Serializer\Mapping\Loader\AnnotationLoader;
+use Throwable;
 
 class ResourceLoader
 {
     /** @var array<string, array<string, array<string, mixed>>> */
-    private array $resources = [];
+    private static array $resources = [];
+    private static ClassMetadataFactoryInterface $classMetadataFactory;
+
+    public function __construct()
+    {
+        self::$classMetadataFactory = new ClassMetadataFactory(new AnnotationLoader(new AnnotationReader()));
+    }
+
+    public function getClassMetatadaFactory(): ClassMetadataFactoryInterface
+    {
+        return self::$classMetadataFactory;
+    }
 
     /**
      * @param string[] $resourceDirectories
@@ -33,13 +47,14 @@ class ResourceLoader
                 $classPath = $namespace . '\\' . $className;
 
                 try {
-                    $reflectionClass = new ReflectionClass($classPath);
+                    $metadata = self::$classMetadataFactory->getMetadataFor($classPath);
+                    $reflectionClass = $metadata->getReflectionClass();
                     /** @var ApiResource|null $apiResource */
                     $apiResource = ($reflectionClass->getAttributes(ApiResource::class)[0] ?? null)?->newInstance();
                     $queries = array_filter($apiResource?->queries ?? [], fn($query) => !$query instanceof QueryCollection);
                     $queryCollections = array_filter($apiResource?->queries ?? [], fn($query) => $query instanceof QueryCollection);
 
-                    $this->resources[$schemaName][$classPath] = [
+                    self::$resources[$schemaName][$classPath] = [
                         'name' => $className,
                         'queries' => $queries,
                         'query_collections' => $queryCollections,
@@ -47,7 +62,7 @@ class ResourceLoader
                         'subscriptions' => $apiResource?->subscriptions ?? [],
                         'reflection' => $reflectionClass
                     ];
-                } catch (\ReflectionException) {
+                } catch (Throwable) {
                 }
             }
         }
@@ -58,7 +73,7 @@ class ResourceLoader
      */
     public function getResources(string $schemaName): array
     {
-        return $this->resources[$schemaName] ?? [];
+        return self::$resources[$schemaName] ?? [];
     }
 
     /**
@@ -66,7 +81,7 @@ class ResourceLoader
      */
     public function getReflectionClass(string $schemaName, string $classPath): ?ReflectionClass
     {
-        return $this->resources[$schemaName][$classPath]['reflection'] ?? null;
+        return self::$resources[$schemaName][$classPath]['reflection'] ?? null;
     }
 
     /**
@@ -74,7 +89,7 @@ class ResourceLoader
      */
     public function getResourceByClassName(string $schemaName, string $className): ?array
     {
-        foreach ($this->resources[$schemaName] ?? [] as $resource) {
+        foreach (self::$resources[$schemaName] ?? [] as $resource) {
             if ($resource['name'] === $className) {
                 return $resource;
             }

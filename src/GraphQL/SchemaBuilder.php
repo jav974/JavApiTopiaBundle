@@ -156,7 +156,7 @@ class SchemaBuilder
                             'resolve' => fn ($payload) => $payload
                         ]
                     ],
-                    'mutateAndGetPayload' => $this->resolverProvider->getResolveCallback($mutation),
+                    'mutateAndGetPayload' => $this->resolverProvider->getResolveCallback($schemaName, $mutation),
                 ]);
 
                 if ($mutation->input) {

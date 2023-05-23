@@ -19,7 +19,9 @@ services:
         arguments: [ '@Jav\ApiTopiaBundle\GraphQL\SchemaBuilder']
         tags: [ console.command ]
 
-    Jav\ApiTopiaBundle\Serializer\Serializer: ~
+    Jav\ApiTopiaBundle\Serializer\Serializer:
+        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader' ]
+
     Jav\ApiTopiaBundle\Serializer\UploadedFileDenormalizer:
         tags: [ serializer.normalizer ]
 

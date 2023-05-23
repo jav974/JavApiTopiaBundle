@@ -2,6 +2,7 @@
 
 namespace Jav\ApiTopiaBundle\GraphQL;
 
+use Closure;
 use GraphQL\Type\Definition\ResolveInfo;
 use GraphQLRelay\Relay;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
@@ -15,8 +16,10 @@ use Symfony\Component\DependencyInjection\ServiceLocator;
 
 class ResolverProvider
 {
-    public function __construct(private readonly ServiceLocator $locator, private readonly Serializer $serializer)
-    {
+    public function __construct(
+        private readonly ServiceLocator $locator,
+        private readonly Serializer $serializer
+    ) {
     }
 
     public function getResolver(string $class): QueryItemResolverInterface|QueryCollectionResolverInterface|MutationResolverInterface
@@ -28,14 +31,15 @@ class ResolverProvider
         return $this->locator->get($class);
     }
 
-    public function getResolveCallback(Attribute $attribute): \Closure
+    public function getResolveCallback(string $schemaName, Attribute $attribute): Closure
     {
         if ($attribute instanceof Mutation) {
-            return function (array $input, $context, ResolveInfo $resolveInfo) use ($attribute) {
+            return function (array $input, $context, ResolveInfo $resolveInfo) use ($attribute, $schemaName) {
                 $context = $context ?? [];
                 $context['info'] = $resolveInfo;
+                $context['schema'] = $schemaName;
 
-                $this->serializer->denormalizeUploadedFiles($input);
+                $this->serializer->denormalizeInput($input);
 
                 if ($attribute->deserialize && $attribute->input) {
                     $input = $this->serializer->denormalize($input, $attribute->input);
@@ -48,10 +52,11 @@ class ResolverProvider
             };
         }
 
-        return function($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute) {
+        return function($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute, $schemaName) {
             $context = $context ?? [];
             $context['info'] = $resolveInfo;
             $context['root'] = $root;
+            $context['schema'] = $schemaName;
 
             if (!empty($args)) {
                 $context['args'] = $args;
@@ -85,7 +90,7 @@ class ResolverProvider
      */
     private function execResolver(Attribute $attribute, array $context): mixed
     {
-        return $this->getResolver($attribute->resolver)($context);
+        return $this->getResolver($attribute->resolver)(context: $context);
     }
 
     private function normalizeData(mixed $data): mixed
@@ -93,20 +98,17 @@ class ResolverProvider
         if (is_iterable($data)) {
             $normalizedData = [];
 
-            foreach ($data as $item) {
-                $normalizedData[] = $this->normalizeData($item);
+            foreach ($data as $key => $item) {
+                $normalizedData[$key] = $this->normalizeData($item);
             }
 
             return $normalizedData;
         }
 
         if (is_object($data)) {
+            $classPath = get_class($data);
+            $className = ReflectionUtils::getClassNameFromClassPath($classPath);
             $normalizedData = $this->serializer->normalize($data);
-            $className = get_class($data);
-
-            if (str_contains($className, '\\')) {
-                $className = substr($className, strrpos($className, '\\') + 1);
-            }
 
             if (isset($normalizedData['id'])) {
                 $normalizedData['_id'] = $normalizedData['id'];

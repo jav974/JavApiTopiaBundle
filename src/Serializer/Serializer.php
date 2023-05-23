@@ -1,16 +1,16 @@
 <?php
 
-
 namespace Jav\ApiTopiaBundle\Serializer;
 
-
 use ArrayObject;
+use Jav\ApiTopiaBundle\GraphQL\ResourceLoader;
 use Psr\Http\Message\UploadedFileInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Encoder\XmlEncoder;
 use Symfony\Component\Serializer\Exception\ExceptionInterface;
+use Symfony\Component\Serializer\Normalizer\DateTimeNormalizer;
 use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
 use Symfony\Component\Serializer\Serializer as BaseSerializer;
 
@@ -18,10 +18,18 @@ class Serializer
 {
     private BaseSerializer $serializer;
 
-    public function __construct()
+    public function __construct(private readonly ResourceLoader $resourceLoader)
     {
-        $encoders = [new XmlEncoder(), new JsonEncoder()];
-        $normalizers = [new UploadedFileDenormalizer(), new ObjectNormalizer(null, null, null, new ReflectionExtractor())];
+        $classMetadataFactory = $this->resourceLoader->getClassMetatadaFactory();
+        $encoders = [new JsonEncoder(), new XmlEncoder()];
+        $normalizers = [
+            new DateTimeNormalizer(),
+            new UploadedFileDenormalizer(),
+            new ObjectNormalizer(
+                classMetadataFactory: $classMetadataFactory,
+                propertyTypeExtractor: new ReflectionExtractor()
+            )
+        ];
         $this->serializer = new BaseSerializer($normalizers, $encoders);
     }
 
@@ -40,12 +48,13 @@ class Serializer
 
     /**
      * @param object|array<mixed>|null $data
+     * @param array<mixed> $context
      * @return array<mixed>|string|int|float|bool|ArrayObject<string, mixed>|null
      * @throws ExceptionInterface
      */
-    public function normalize(object|array|null $data): array|string|int|float|bool|ArrayObject|null
+    public function normalize(object|array|null $data, array $context = []): array|string|int|float|bool|ArrayObject|null
     {
-        return $this->serializer->normalize($data);
+        return $this->serializer->normalize($data, context: $context);
     }
 
     /**
@@ -62,13 +71,13 @@ class Serializer
      * @param array<mixed> $data
      * @throws ExceptionInterface
      */
-    public function denormalizeUploadedFiles(array &$data): void
+    public function denormalizeInput(array &$data): void
     {
         foreach ($data as &$datum) {
-            if ($datum instanceof UploadedFileInterface) {
+            if (is_array($datum)) {
+                $this->denormalizeInput($datum);
+            } elseif ($datum instanceof UploadedFileInterface) {
                 $datum = $this->serializer->denormalize($datum, UploadedFile::class);
-            } elseif (is_array($datum)) {
-                $this->denormalizeUploadedFiles($datum);
             }
         }
     }

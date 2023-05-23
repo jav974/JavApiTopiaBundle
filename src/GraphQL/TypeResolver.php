@@ -58,6 +58,8 @@ class TypeResolver
     {
         if ($classPath === UploadedFile::class) {
             return $this->types['Upload'] ??= new UploadType();
+        } elseif (in_array($classPath, [\DateTimeInterface::class, \DateTime::class, \DateTimeImmutable::class])) {
+            return Type::string();
         }
 
         $typeName = ReflectionUtils::getClassNameFromClassPath($classPath);
@@ -124,7 +126,7 @@ class TypeResolver
 
         if ($attribute) {
             $field['args'] = $this->resolveAttributeArgs($schemaName, $attribute);
-            $field['resolve'] = $this->resolverProvider->getResolveCallback($attribute);
+            $field['resolve'] = $this->resolverProvider->getResolveCallback($schemaName, $attribute);
         }
 
         if ($attribute instanceof QueryCollection && $attribute->paginationEnabled) {
