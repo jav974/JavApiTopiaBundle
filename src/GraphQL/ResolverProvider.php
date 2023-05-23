@@ -58,16 +58,25 @@ class ResolverProvider
             }
 
             $data = $this->execResolver($attribute, $context);
+            $normalizedData = $this->normalizeData($data);
 
-            if ($attribute instanceof QueryCollection) {
-                $normalizedData = $this->normalizeData($data);
-                $connectionData = Relay::connectionFromArray($normalizedData, $args);
+            // TODO: in case of pagination, we extract the total count from the items returned by the resolver
+            // TODO: which is bad because it means we have to fetch all the items to get the total count
+            // TODO: relay connection will extract a slice of the total, but we could find another way to get the total count and the correct sliced items
+
+            if ($attribute instanceof QueryCollection && $attribute->paginationEnabled) {
+                if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
+                    $connectionData = Relay::connectionFromArray($normalizedData, $args);
+                } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
+                    $connectionData = ['items' => $normalizedData];
+                }
+
                 $connectionData['totalCount'] = count($normalizedData);
 
                 return $connectionData;
             }
 
-            return $this->normalizeData($data);
+            return $normalizedData;
         };
     }
 

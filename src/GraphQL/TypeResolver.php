@@ -127,9 +127,14 @@ class TypeResolver
             $field['resolve'] = $this->resolverProvider->getResolveCallback($attribute);
         }
 
-        if ($attribute instanceof QueryCollection) {
-            $type = $this->getRelayConnection($schemaName, $outputClassName, $type);
-            $field['args'] += Relay::connectionArgs();
+        if ($attribute instanceof QueryCollection && $attribute->paginationEnabled) {
+            if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
+                $type = $this->getRelayConnection($schemaName, $outputClassName, $type);
+                $field['args'] += Relay::connectionArgs();
+            } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
+                $type = $this->getOffsetConnection($schemaName, $outputClassName, $type);
+                $field['args'] +=$this->getOffsetConnectionArgs();
+            }
         }
 
         $field['type'] = $type;
@@ -189,6 +194,48 @@ class TypeResolver
         $this->types[$schemaName . '.' . $reflectionClass->getShortName()] = $type;
 
         return $type;
+    }
+
+    private function getOffsetConnection(string $schemaName, string $outputClassName, Type $type): ObjectType
+    {
+        if ($type instanceof WrappingType) {
+            $type = $type->getInnerMostType();
+        }
+
+        $connectionName = $outputClassName . 'OffsetConnection';
+
+        // @phpstan-ignore-next-line
+        return $this->types["$schemaName.$connectionName"] ??= new ObjectType([
+            'name' => $connectionName,
+            'fields' => [
+                'items' => [
+                    'type' => Type::listOf($type),
+                    'description' => 'The list of items in the connection.',
+                ],
+                'totalCount' => [
+                    'type' => Type::nonNull(Type::int()),
+                    'description' => 'The total count of items in the connection.',
+                    'resolve' => static function (array $data): int {
+                        return $data['count'];
+                    },
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function getOffsetConnectionArgs(): array
+    {
+        return [
+            'limit' => [
+                'type' => Type::int()
+            ],
+            'offset' => [
+                'type' => Type::int()
+            ]
+        ];
     }
 
     private function getRelayConnection(string $schemaName, string $outputClassName, Type $type): ObjectType
