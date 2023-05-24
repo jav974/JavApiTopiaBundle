@@ -54,8 +54,17 @@ class ResolverProvider
         return function($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute, $schemaName) {
             $context = $context ?? [];
             $context['info'] = $resolveInfo;
-            $context['root'] = $root;
             $context['schema'] = $schemaName;
+
+            if ($root) {
+                $context['source'] = [
+                    'item' => $root,
+                    '#itemResourceClass' => get_class($root),
+                    '#itemIdentifiers' => [
+                        'id' => $root->id ?? null
+                    ]
+                ];
+            }
 
             if (!empty($args)) {
                 $context['args'] = $args;

@@ -194,14 +194,10 @@ class TypeResolver
                         $fields[$propertyName]['resolve'] = fn ($object) => $object?->id;
                     } elseif (!$fieldInfo['attribute']) {
                         $fields[$propertyName]['resolve'] = function ($object) use ($propertyName, $propertyMetadata) {
-                            if (isset($object->{$propertyName})) {
-                                return $this->serializer->normalize(
-                                    $object->{$propertyName},
-                                    $propertyMetadata->getNormalizationContexts()['*'] ?? []
-                                );
-                            }
-
-                            return null;
+                            return isset($object->{$propertyName}) ? $this->serializer->normalize(
+                                $object->{$propertyName},
+                                $propertyMetadata->getNormalizationContexts()['*'] ?? []
+                            ) : null;
                         };
                     }
                 }
