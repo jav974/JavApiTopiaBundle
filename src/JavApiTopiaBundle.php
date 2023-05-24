@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Jav\ApiTopiaBundle;
-
 
 use Jav\ApiTopiaBundle\DependencyInjection\ApiTopiaExtension;
 use Jav\ApiTopiaBundle\DependencyInjection\Compiler\ResolverPass;
@@ -20,7 +18,7 @@ class JavApiTopiaBundle extends Bundle
     {
         return new ApiTopiaExtension();
     }
-    
+
     public function build(ContainerBuilder $container): void
     {
         $container->addCompilerPass(new ResolverPass());

@@ -1,6 +1,5 @@
 <?php
 
-
 namespace Jav\ApiTopiaBundle\Api\Attributes\Rest;
 
 use Jav\ApiTopiaBundle\Api\Attributes\Attribute as BaseAttribute;

@@ -53,7 +53,7 @@ class ResolverProvider
             };
         }
 
-        return function($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute, $schemaName) {
+        return function ($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute, $schemaName) {
             $isPaginatedCollection = $attribute instanceof QueryCollection && $attribute->paginationEnabled;
             $context = $context ?? [];
             $context += $this->getQueryContext($resolveInfo, $schemaName, $root, $args, $isPaginatedCollection);

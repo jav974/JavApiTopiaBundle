@@ -10,7 +10,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 #[AsCommand(
     name: 'apitopia:build-schema',
-    description: 'Builds the GraphQL schema',)]
+    description: 'Builds the GraphQL schema'
+)]
 final class BuildSchemaCommand extends Command
 {
     public function __construct(private readonly SchemaBuilder $schemaBuilder)

@@ -137,7 +137,7 @@ class TypeResolver
                 $field['args'] += Relay::connectionArgs();
             } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
                 $type = $this->getOffsetConnection($schemaName, $outputClassName, $type);
-                $field['args'] +=$this->getOffsetConnectionArgs();
+                $field['args'] += $this->getOffsetConnectionArgs();
             }
         }
 

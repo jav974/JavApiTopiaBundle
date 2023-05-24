@@ -1,6 +1,5 @@
 <?php
 
-
 namespace Jav\ApiTopiaBundle\Api;
 
 /**

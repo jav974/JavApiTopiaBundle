@@ -51,7 +51,7 @@ class RouteLoader extends Loader
 
     private function loadGraphQLEndpoints(RouteCollection $routes): void
     {
-        foreach ($this->graphQLEndpoints as $schemaName =>  $endpoint) {
+        foreach ($this->graphQLEndpoints as $schemaName => $endpoint) {
             $routes->add('apitopia_graphql_' . $schemaName, new Route($endpoint, [
                 '_controller' => 'Jav\ApiTopiaBundle\GraphQL\RequestHandler::handleRequest',
                 '_apitopia' => [

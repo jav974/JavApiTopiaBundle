@@ -1,6 +1,5 @@
 <?php
 
-
 namespace Jav\ApiTopiaBundle\Api\Attributes;
 
 abstract class Attribute

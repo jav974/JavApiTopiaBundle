@@ -2,7 +2,7 @@
 
 namespace Jav\ApiTopiaBundle\Api\GraphQL\Attributes;
 
-#[\Attribute(\Attribute::IS_REPEATABLE|\Attribute::TARGET_PARAMETER)]
+#[\Attribute(\Attribute::IS_REPEATABLE | \Attribute::TARGET_PARAMETER)]
 class QueryCollection extends Query
 {
     public const PAGINATION_TYPE_CURSOR = 'cursor';

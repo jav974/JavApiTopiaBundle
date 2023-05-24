@@ -2,7 +2,7 @@
 
 namespace Jav\ApiTopiaBundle\Api\GraphQL\Attributes;
 
-#[\Attribute(\Attribute::IS_REPEATABLE|\Attribute::TARGET_PARAMETER)]
+#[\Attribute(\Attribute::IS_REPEATABLE | \Attribute::TARGET_PARAMETER)]
 class Query extends Attribute
 {
     /**

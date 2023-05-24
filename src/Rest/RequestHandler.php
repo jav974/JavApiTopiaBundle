@@ -40,7 +40,7 @@ class RequestHandler
             $this->checkOutput($attribute, $data);
 
             return $this->serialize($attribute, $data);
-        } catch (\ReflectionException|Exception $e) {
+        } catch (\ReflectionException | Exception $e) {
         }
 
         return null;
