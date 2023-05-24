@@ -236,9 +236,7 @@ class TypeResolver
                 'totalCount' => [
                     'type' => Type::nonNull(Type::int()),
                     'description' => 'The total count of items in the connection.',
-                    'resolve' => static function (array $data): int {
-                        return $data['count'];
-                    },
+                    'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
                 ],
             ],
         ]);
