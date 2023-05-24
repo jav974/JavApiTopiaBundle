@@ -56,63 +56,87 @@ class ResolverProvider
         return function($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute, $schemaName) {
             $isPaginatedCollection = $attribute instanceof QueryCollection && $attribute->paginationEnabled;
             $context = $context ?? [];
-            $context['info'] = $resolveInfo;
-            $context['schema'] = $schemaName;
-
-            if ($root) {
-                $context['source'] = [
-                    'item' => $root,
-                    '#itemResourceClass' => get_class($root),
-                    '#itemIdentifiers' => [
-                        'id' => $root->id ?? null
-                    ]
-                ];
-            }
-
-            if (!empty($args)) {
-                $context['args'] = $args;
-            }
-
-            if ($isPaginatedCollection) {
-                $this->toLimits($args, $offset, $limit);
-
-                $context['pagination'] = [
-                    'offset' => $offset,
-                    'limit' => $limit
-                ];
-            }
+            $context += $this->getQueryContext($resolveInfo, $schemaName, $root, $args, $isPaginatedCollection);
 
             $data = $this->execResolver($attribute, $context);
 
             if ($isPaginatedCollection) {
-                $connectionData = [];
-
-                if (is_array($data)) {
-                    if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
-                        $connectionData = Relay::connectionFromArray($data, $args);
-                    } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
-                        $connectionData = ['items' => array_slice($data, $context['pagination']['offset'], $context['pagination']['limit'])];
-                    }
-
-                    $connectionData['totalCount'] = count($data);
-                } elseif ($data instanceof PaginatorInterface) {
-                    if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
-                        $connectionData = Relay::connectionFromArraySlice($data->getCurrentPageResults(), $args, [
-                            'sliceStart' => $data->getCurrentPageOffset(),
-                            'arrayLength' => $data->getTotalItems()
-                        ]);
-                    } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
-                        $connectionData = ['items' => $data->getCurrentPageResults()];
-                    }
-
-                    $connectionData['totalCount'] = $data->getTotalItems();
-                }
-
-                return $connectionData;
+                $data = $this->handlePaginatedCollection($attribute, $data, $args, $context);
             }
 
             return $data;
         };
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>
+     */
+    private function getQueryContext(ResolveInfo $resolveInfo, string $schemaName, ?object $root, array $args, bool $isPaginatedCollection): array
+    {
+        $context = [
+            'info' => $resolveInfo,
+            'schema' => $schemaName,
+        ];
+
+        if ($root) {
+            $context['source'] = [
+                'item' => $root,
+                '#itemResourceClass' => get_class($root),
+                '#itemIdentifiers' => [
+                    'id' => $root->id ?? null
+                ]
+            ];
+        }
+
+        if (!empty($args)) {
+            $context['args'] = $args;
+        }
+
+        if ($isPaginatedCollection) {
+            $this->toLimits($args, $offset, $limit);
+
+            $context['pagination'] = [
+                'offset' => $offset,
+                'limit' => $limit
+            ];
+        }
+
+        return $context;
+    }
+
+    /**
+     * @param array<object>|PaginatorInterface<object> $data
+     * @param array<string, mixed> $args
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    private function handlePaginatedCollection(QueryCollection $attribute, array|PaginatorInterface $data, array $args, array $context): array
+    {
+        $connectionData = [];
+
+        if (is_array($data)) {
+            if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
+                $connectionData = Relay::connectionFromArray($data, $args);
+            } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
+                $connectionData = ['items' => array_slice($data, $context['pagination']['offset'], $context['pagination']['limit'])];
+            }
+
+            $connectionData['totalCount'] = count($data);
+        } elseif ($data instanceof PaginatorInterface) {
+            if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
+                $connectionData = Relay::connectionFromArraySlice($data->getCurrentPageResults(), $args, [
+                    'sliceStart' => $data->getCurrentPageOffset(),
+                    'arrayLength' => $data->getTotalItems()
+                ]);
+            } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
+                $connectionData = ['items' => $data->getCurrentPageResults()];
+            }
+
+            $connectionData['totalCount'] = $data->getTotalItems();
+        }
+
+        return $connectionData;
     }
 
     /**
