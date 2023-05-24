@@ -13,6 +13,7 @@ use GraphQLRelay\Relay;
 use InvalidArgumentException;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
+use Jav\ApiTopiaBundle\Serializer\Serializer;
 use ReflectionClass;
 use RuntimeException;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
@@ -28,6 +29,7 @@ class TypeResolver
     public function __construct(
         private readonly ResourceLoader $resourceLoader,
         private readonly ResolverProvider $resolverProvider,
+        private readonly Serializer $serializer,
         private readonly ?NodeResolverInterface $nodeResolver = null
     ) {
         $this->types = Type::getStandardTypes();
@@ -159,15 +161,21 @@ class TypeResolver
             'name' => $reflectionClass->getShortName(),
             'description' => ReflectionUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null),
             'fields' => function () use ($reflectionClass, $schemaName, $isNodeInterface) {
+                $metadata = $this->resourceLoader->getClassMetatadaFactory()->getMetadataFor($reflectionClass->getName())->getAttributesMetadata();
                 $fields = [];
 
                 if ($isNodeInterface) {
-                    $fields['id'] = Relay::globalIdField();
+                    $fields['id'] = Relay::globalIdField("$schemaName.{$reflectionClass->getShortName()}", fn ($object) => $object->id);
                 }
 
                 foreach ($reflectionClass->getProperties() as $reflectionProperty) {
                     $fieldInfo = ReflectionUtils::extractFieldInfoFromProperty($reflectionProperty);
                     $propertyName = $fieldInfo['name'];
+                    $propertyMetadata = $metadata[$propertyName];
+
+                    if ($propertyMetadata->isIgnored()) {
+                        continue;
+                    }
 
                     if ($propertyName === 'id' && $isNodeInterface) {
                         $propertyName = '_id';
@@ -178,9 +186,24 @@ class TypeResolver
                         $fieldInfo['type'],
                         $fieldInfo['description'],
                         $fieldInfo['allowsNull'],
-                        $fieldInfo['queryCollection'],
+                        $fieldInfo['attribute'],
                         $fieldInfo['isCollection']
                     );
+
+                    if ($propertyName === '_id' && $isNodeInterface) {
+                        $fields[$propertyName]['resolve'] = fn ($object) => $object?->id;
+                    } elseif (!$fieldInfo['attribute']) {
+                        $fields[$propertyName]['resolve'] = function ($object) use ($propertyName, $propertyMetadata) {
+                            if (isset($object->{$propertyName})) {
+                                return $this->serializer->normalize(
+                                    $object->{$propertyName},
+                                    $propertyMetadata->getNormalizationContexts()['*'] ?? []
+                                );
+                            }
+
+                            return null;
+                        };
+                    }
                 }
 
                 return $fields;

@@ -47,8 +47,7 @@ class ResolverProvider
 
                 $context['args']['input'] = $input;
 
-                $data = $this->execResolver($attribute, $context);
-                return $this->normalizeData($data);
+                return ['data' => $this->execResolver($attribute, $context)];
             };
         }
 
@@ -63,7 +62,6 @@ class ResolverProvider
             }
 
             $data = $this->execResolver($attribute, $context);
-            $normalizedData = $this->normalizeData($data);
 
             // TODO: in case of pagination, we extract the total count from the items returned by the resolver
             // TODO: which is bad because it means we have to fetch all the items to get the total count
@@ -71,17 +69,17 @@ class ResolverProvider
 
             if ($attribute instanceof QueryCollection && $attribute->paginationEnabled) {
                 if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
-                    $connectionData = Relay::connectionFromArray($normalizedData, $args);
+                    $connectionData = Relay::connectionFromArray($data, $args);
                 } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
-                    $connectionData = ['items' => $normalizedData];
+                    $connectionData = ['items' => $data];
                 }
 
-                $connectionData['totalCount'] = count($normalizedData);
+                $connectionData['totalCount'] = count($data);
 
                 return $connectionData;
             }
 
-            return $normalizedData;
+            return $data;
         };
     }
 
@@ -91,33 +89,5 @@ class ResolverProvider
     private function execResolver(Attribute $attribute, array $context): mixed
     {
         return $this->getResolver($attribute->resolver)(context: $context);
-    }
-
-    private function normalizeData(mixed $data): mixed
-    {
-        if (is_iterable($data)) {
-            $normalizedData = [];
-
-            foreach ($data as $key => $item) {
-                $normalizedData[$key] = $this->normalizeData($item);
-            }
-
-            return $normalizedData;
-        }
-
-        if (is_object($data)) {
-            $classPath = get_class($data);
-            $className = ReflectionUtils::getClassNameFromClassPath($classPath);
-            $normalizedData = $this->serializer->normalize($data);
-
-            if (isset($normalizedData['id'])) {
-                $normalizedData['_id'] = $normalizedData['id'];
-                $normalizedData['id'] = Relay::toGlobalId($className, $data->id);
-            }
-
-            return $normalizedData;
-        }
-
-        return $data;
     }
 }

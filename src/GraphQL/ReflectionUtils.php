@@ -2,7 +2,7 @@
 
 namespace Jav\ApiTopiaBundle\GraphQL;
 
-use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
+use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQuery;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQueryCollection;
 use ReflectionNamedType;
 use ReflectionProperty;
@@ -14,10 +14,10 @@ class ReflectionUtils
      */
     public static function extractFieldInfoFromProperty(ReflectionProperty $reflectionProperty): array
     {
-        $queryCollectionAttribute = $reflectionProperty->getAttributes(SubQueryCollection::class)[0] ?? null;
+        $attribute = $reflectionProperty->getAttributes(SubQueryCollection::class)[0] ?? $reflectionProperty->getAttributes(SubQuery::class)[0] ?? null;
         $comment = $reflectionProperty->getDocComment() ?: null;
-        /** @var QueryCollection|null $queryCollection */
-        $queryCollection = $queryCollectionAttribute?->newInstance();
+        /** @var SubQuery|SubQueryCollection|null $attributeInstance */
+        $attributeInstance = $attribute?->newInstance();
         $reflectionType = $reflectionProperty->getType();
         $type = null;
 
@@ -29,7 +29,7 @@ class ReflectionUtils
         $docCommentType = self::getTypeFromDocComment($comment);
         $isCollection = $isCollection || str_contains($docCommentType ?? '', '[]');
         $docCommentType = $docCommentType ? str_replace('[]', '', $docCommentType) : null;
-        $type = $isCollection ? $queryCollection?->output ?? $docCommentType ?? $type : $type;
+        $type = $isCollection ? $attributeInstance?->output ?? $docCommentType ?? $type : $type;
         $propertyName = $reflectionProperty->getName();
 
         return [
@@ -37,7 +37,7 @@ class ReflectionUtils
             'description' => self::getDescriptionFromDocComment($comment),
             'type' => $type,
             'isCollection' => $isCollection,
-            'queryCollection' => $queryCollection,
+            'attribute' => $attributeInstance,
             'allowsNull' => $reflectionType?->allowsNull() ?? true,
             'isBuiltin' => $reflectionType instanceof ReflectionNamedType && $reflectionType->isBuiltin(),
         ];

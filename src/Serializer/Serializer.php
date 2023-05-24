@@ -47,12 +47,11 @@ class Serializer
     }
 
     /**
-     * @param object|array<mixed>|null $data
      * @param array<mixed> $context
      * @return array<mixed>|string|int|float|bool|ArrayObject<string, mixed>|null
      * @throws ExceptionInterface
      */
-    public function normalize(object|array|null $data, array $context = []): array|string|int|float|bool|ArrayObject|null
+    public function normalize(mixed $data, array $context = []): array|string|int|float|bool|ArrayObject|null
     {
         return $this->serializer->normalize($data, context: $context);
     }

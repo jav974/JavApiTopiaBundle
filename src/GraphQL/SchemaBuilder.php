@@ -153,7 +153,7 @@ class SchemaBuilder
                     'outputFields' => [
                         $fieldName => [
                             'type' => $this->typeResolver->resolve($schemaName, $outputType, false),
-                            'resolve' => fn ($payload) => $payload
+                            'resolve' => fn ($payload) => $payload['data']
                         ]
                     ],
                     'mutateAndGetPayload' => $this->resolverProvider->getResolveCallback($schemaName, $mutation),

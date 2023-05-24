@@ -3,6 +3,7 @@
 namespace Jav\ApiTopiaBundle\GraphQL;
 
 use GraphQL\Error\DebugFlag;
+use GraphQL\Error\FormattedError;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Server\ServerConfig;
 use GraphQL\Server\StandardServer;
@@ -49,7 +50,7 @@ class RequestHandler
 
             return new JsonResponse($jsonResult, 200, [], true);
         } catch (\Throwable $e) {
-            return new JsonResponse(['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
+            return new JsonResponse(['errors' => [FormattedError::createFromException($e)]], 500);
         }
     }
 
