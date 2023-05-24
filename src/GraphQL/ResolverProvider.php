@@ -4,6 +4,7 @@ namespace Jav\ApiTopiaBundle\GraphQL;
 
 use Closure;
 use GraphQL\Type\Definition\ResolveInfo;
+use GraphQLRelay\Connection\ArrayConnection;
 use GraphQLRelay\Relay;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Mutation;
@@ -11,6 +12,7 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\MutationResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
+use Jav\ApiTopiaBundle\Pagination\PaginatorInterface;
 use Jav\ApiTopiaBundle\Serializer\Serializer;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 
@@ -52,6 +54,7 @@ class ResolverProvider
         }
 
         return function($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute, $schemaName) {
+            $isPaginatedCollection = $attribute instanceof QueryCollection && $attribute->paginationEnabled;
             $context = $context ?? [];
             $context['info'] = $resolveInfo;
             $context['schema'] = $schemaName;
@@ -70,20 +73,40 @@ class ResolverProvider
                 $context['args'] = $args;
             }
 
+            if ($isPaginatedCollection) {
+                $this->toLimits($args, $offset, $limit);
+
+                $context['pagination'] = [
+                    'offset' => $offset,
+                    'limit' => $limit
+                ];
+            }
+
             $data = $this->execResolver($attribute, $context);
 
-            // TODO: in case of pagination, we extract the total count from the items returned by the resolver
-            // TODO: which is bad because it means we have to fetch all the items to get the total count
-            // TODO: relay connection will extract a slice of the total, but we could find another way to get the total count and the correct sliced items
+            if ($isPaginatedCollection) {
+                $connectionData = [];
 
-            if ($attribute instanceof QueryCollection && $attribute->paginationEnabled) {
-                if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
-                    $connectionData = Relay::connectionFromArray($data, $args);
-                } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
-                    $connectionData = ['items' => $data];
+                if (is_array($data)) {
+                    if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
+                        $connectionData = Relay::connectionFromArray($data, $args);
+                    } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
+                        $connectionData = ['items' => array_slice($data, $context['pagination']['offset'], $context['pagination']['limit'])];
+                    }
+
+                    $connectionData['totalCount'] = count($data);
+                } elseif ($data instanceof PaginatorInterface) {
+                    if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
+                        $connectionData = Relay::connectionFromArraySlice($data->getCurrentPageResults(), $args, [
+                            'sliceStart' => $data->getCurrentPageOffset(),
+                            'arrayLength' => $data->getTotalItems()
+                        ]);
+                    } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
+                        $connectionData = ['items' => $data->getCurrentPageResults()];
+                    }
+
+                    $connectionData['totalCount'] = $data->getTotalItems();
                 }
-
-                $connectionData['totalCount'] = count($data);
 
                 return $connectionData;
             }
@@ -98,5 +121,30 @@ class ResolverProvider
     private function execResolver(Attribute $attribute, array $context): mixed
     {
         return $this->getResolver($attribute->resolver)(context: $context);
+    }
+
+    /**
+     * Finds the firstResult and maxResults from context query
+     * This method can handle cursor based pagination (first, before, last, after)
+     * If we'd like to change this navigation to something else, this is the only location where we would operate on the new args
+     * No matter what, in the end we just need $firstResult (offset) and $maxResults (limit)
+     *
+     * @param array<string, mixed> $filters
+     */
+    private function toLimits(array $filters, ?int &$firstResult = null, ?int &$maxResults = null): void
+    {
+        $maxResults = $filters['first'] ?? $filters['last'] ?? $filters['limit'] ?? 50;
+        $firstResult = $filters['offset'] ?? 0;
+
+        // 'before' and 'after' are integers corresponding to the position of the element in the array
+        // They are base64 encoded integer, so we have to decode them in order to compute something
+
+        if (isset($filters['last']) && isset($filters['before'])) {
+            $firstResult = ArrayConnection::cursorToOffset($filters['before']) - $filters['last'];
+        } elseif (isset($filters['first']) && isset($filters['after'])) {
+            $firstResult = ArrayConnection::cursorToOffset($filters['after']) + 1;
+        } elseif (isset($filters['last'])) {
+            $firstResult = -$filters['last'];
+        }
     }
 }
