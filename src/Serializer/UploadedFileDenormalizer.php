@@ -34,7 +34,10 @@ class UploadedFileDenormalizer implements DenormalizerInterface
         );
     }
 
-    public function supportsDenormalization(mixed $data, string $type, string $format = null): bool
+    /**
+     * @param array<mixed> $context
+     */
+    public function supportsDenormalization(mixed $data, string $type, string $format = null, array $context = []): bool
     {
         return $type === UploadedFile::class && ($data instanceof UploadedFileInterface || $data instanceof UploadedFile);
     }

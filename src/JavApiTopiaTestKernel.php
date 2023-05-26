@@ -1,0 +1,63 @@
+<?php
+
+namespace Jav\ApiTopiaBundle;
+
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\FavoriteProductsResolver;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\StatResolver;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\UserResolver;
+use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
+use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Component\Config\Loader\LoaderInterface;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\HttpKernel\Kernel as BaseKernel;
+
+class JavApiTopiaTestKernel extends BaseKernel
+{
+    use MicroKernelTrait;
+
+    public function __construct()
+    {
+        parent::__construct('test', true);
+    }
+
+    public function registerBundles(): iterable
+    {
+        return [
+            new JavApiTopiaBundle(),
+            new FrameworkBundle(),
+        ];
+    }
+
+    public function registerContainerConfiguration(LoaderInterface $loader): void
+    {
+        $loader->load(function (ContainerBuilder $container) {
+            $container->loadFromExtension('framework', [
+                'test' => true,
+                'http_method_override' => false,
+                'router' => [
+                    'utf8' => true,
+                    'type' => 'apitopia',
+                    'resource' => '.'
+                ]
+            ]);
+
+            $container->loadFromExtension('api_topia', [
+                'schema_output_dir' => '%kernel.project_dir%/tests/GraphQL/Output',
+                'schemas' => [
+                    'test1' => [
+                        'resource_directories' => ['%kernel.project_dir%/tests/GraphQL/Schema/Test1/DTO'],
+                        'path' => '/test/graphql/test1'
+                    ],
+                    'test2' => [
+                        'resource_directories' => ['%kernel.project_dir%/tests/GraphQL/Schema/Test2/DTO'],
+                        'path' => '/test/graphql/test2'
+                    ],
+                ]
+            ]);
+
+            $container->register(UserResolver::class)->addTag('apitopia.graphql_resolver');
+            $container->register(FavoriteProductsResolver::class)->addTag('apitopia.graphql_resolver');
+            $container->register(StatResolver::class)->addTag('apitopia.graphql_resolver');
+        });
+    }
+}

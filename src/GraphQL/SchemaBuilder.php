@@ -23,16 +23,29 @@ class SchemaBuilder
     /** @var array<string, Schema> */
     private array $schemas = [];
 
-    /**
-     * @param array<string, mixed> $config
-     */
+    /** @var array<string, mixed> */
+    private array $config;
+
+    private string $schemaOutputDirectory;
+
     public function __construct(
-        private readonly array $config,
-        private readonly string $schemaOutputDirectory,
         private readonly ResourceLoader $resourceLoader,
         private readonly TypeResolver $typeResolver,
         private readonly ResolverProvider $resolverProvider
     ) {
+    }
+
+    public function setSchemaOutputDirectory(string $schemaOutputDirectory): void
+    {
+        $this->schemaOutputDirectory = $schemaOutputDirectory;
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    public function setConfig(array $config): void
+    {
+        $this->config = $config;
     }
 
     /**
@@ -129,7 +142,7 @@ class SchemaBuilder
         ]);
     }
 
-    private function buildMutationObject(string $schemaName): ObjectType
+    private function buildMutationObject(string $schemaName): ?ObjectType
     {
         $resources = $this->resourceLoader->getResources($schemaName);
         $fields = [];
@@ -175,6 +188,10 @@ class SchemaBuilder
 
                 $fields[$operationName] = $mutationData;
             }
+        }
+
+        if (empty($fields)) {
+            return null;
         }
 
         return new ObjectType([

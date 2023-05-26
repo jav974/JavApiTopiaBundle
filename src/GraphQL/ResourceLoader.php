@@ -33,7 +33,7 @@ class ResourceLoader
      */
     public function loadResources(string $schemaName, array $resourceDirectories): void
     {
-        if (isset($this->resources[$schemaName])) {
+        if (isset(self::$resources[$schemaName])) {
             return ;
         }
 
@@ -62,7 +62,8 @@ class ResourceLoader
                         'subscriptions' => $apiResource?->subscriptions ?? [],
                         'reflection' => $reflectionClass
                     ];
-                } catch (Throwable) {
+                } catch (Throwable $e) {
+                    $a = 1;
                 }
             }
         }

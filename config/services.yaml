@@ -31,7 +31,10 @@ services:
         autoconfigure: true
         tags: [ 'controller.service_arguments' ]
 
-    Jav\ApiTopiaBundle\GraphQL\SchemaBuilder: ~
+    Jav\ApiTopiaBundle\GraphQL\SchemaBuilder:
+        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader', '@Jav\ApiTopiaBundle\GraphQL\TypeResolver', '@Jav\ApiTopiaBundle\GraphQL\ResolverProvider' ]
+        public: true
+
     Jav\ApiTopiaBundle\GraphQL\ResourceLoader: ~
     Jav\ApiTopiaBundle\GraphQL\Client: ~
     Jav\ApiTopiaBundle\GraphQL\ResolverProvider:

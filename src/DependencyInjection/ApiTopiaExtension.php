@@ -8,10 +8,7 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
 use Jav\ApiTopiaBundle\Api\ResolverInterface;
 use Jav\ApiTopiaBundle\Controller\GraphiQLController;
-use Jav\ApiTopiaBundle\GraphQL\ResolverProvider;
-use Jav\ApiTopiaBundle\GraphQL\ResourceLoader;
 use Jav\ApiTopiaBundle\GraphQL\SchemaBuilder;
-use Jav\ApiTopiaBundle\GraphQL\TypeResolver;
 use Jav\ApiTopiaBundle\Loader\RouteLoader;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -43,11 +40,8 @@ class ApiTopiaExtension extends ConfigurableExtension
         $loader->load('services.yaml');
 
         $container->getDefinition(SchemaBuilder::class)
-            ->setArgument('$config', $mergedConfig['schemas'] ?? [])
-            ->setArgument('$schemaOutputDirectory', $mergedConfig['schema_output_dir'])
-            ->setArgument('$resourceLoader', $container->getDefinition(ResourceLoader::class))
-            ->setArgument('$typeResolver', $container->getDefinition(TypeResolver::class))
-            ->setArgument('$resolverProvider', $container->getDefinition(ResolverProvider::class))
+            ->addMethodCall('setConfig', [$mergedConfig['schemas'] ?? []])
+            ->addMethodCall('setSchemaOutputDirectory', [$mergedConfig['schema_output_dir']])
         ;
 
         $graphQLEndpoints = [];
