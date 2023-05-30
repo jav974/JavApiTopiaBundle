@@ -22,9 +22,9 @@ class ApiResource
         public array $graphQLOperations = [],
     ) {
         if (!empty($this->graphQLOperations)) {
-            $this->queries = array_unique(array_merge($this->queries, array_filter($this->graphQLOperations, fn ($operation) => $operation instanceof Query)));
-            $this->mutations = array_unique(array_merge($this->mutations, array_filter($this->graphQLOperations, fn ($operation) => $operation instanceof Mutation)));
-//            $this->subscriptions = array_unique(array_merge($this->subscriptions, array_filter($this->graphQLOperations, fn ($operation) => $operation instanceof Subscription)));
+            $this->queries = array_unique(array_merge($this->queries, array_filter($this->graphQLOperations, fn ($operation) => $operation instanceof Query)), SORT_REGULAR);
+            $this->mutations = array_unique(array_merge($this->mutations, array_filter($this->graphQLOperations, fn ($operation) => $operation instanceof Mutation)), SORT_REGULAR);
+//            $this->subscriptions = array_unique(array_merge($this->subscriptions, array_filter($this->graphQLOperations, fn ($operation) => $operation instanceof Subscription)), SORT_REGULAR);
         }
     }
 }

@@ -18,7 +18,7 @@ class Schema1QueryTest extends AbstractApiTestCase
                     address {
                         street
                         city
-                        country                    
+                        country
                     }
                     otherAddreses {
                         street

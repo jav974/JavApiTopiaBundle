@@ -6,13 +6,13 @@ namespace Jav\ApiTopiaBundle\Api\GraphQL\Attributes;
 class SubQuery extends Query
 {
     /**
-     * @param array<string, array<string, string>>|null $args
+     * @param array<string, array<string, string>> $args
      */
     public function __construct(
         string $resolver,
+        array $args,
         ?string $output = null,
-        ?string $description = null,
-        ?array $args = null
+        ?string $description = null
     ) {
         parent::__construct($resolver, $output, null, $description, $args);
     }

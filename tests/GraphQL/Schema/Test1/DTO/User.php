@@ -33,6 +33,6 @@ class User
     #[SubQueryCollection(resolver: FavoriteProductsResolver::class, paginationEnabled: false, output: Product::class, description: "List of favorite products (not paginated)")]
     public array $favoriteNotPaginatedProducts;
 
-    #[SubQuery(resolver: StatResolver::class, output: Stat::class, description: "Compute (heavy) stats")]
+    #[SubQuery(resolver: StatResolver::class, args: [], output: Stat::class, description: "Compute (heavy) stats")]
     public Stat $userStats;
 }

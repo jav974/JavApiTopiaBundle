@@ -165,7 +165,7 @@ class TypeResolver
                 $fields = [];
 
                 if ($isNodeInterface) {
-                    $fields['id'] = Relay::globalIdField("$schemaName.{$reflectionClass->getShortName()}", fn ($object) => $object->id);
+                    $fields['id'] = Relay::globalIdField("$schemaName.{$reflectionClass->getShortName()}", fn ($object) => is_object($object) ? $object->id : (is_array($object) ? $object['id'] : null));
                 }
 
                 foreach ($reflectionClass->getProperties() as $reflectionProperty) {
@@ -191,7 +191,7 @@ class TypeResolver
                     );
 
                     if ($propertyName === '_id' && $isNodeInterface) {
-                        $fields[$propertyName]['resolve'] = fn ($object) => $object?->id;
+                        $fields[$propertyName]['resolve'] = fn ($object) => is_object($object) ? $object->id : (is_array($object) ? $object['id'] : null);
                     } elseif (!$fieldInfo['attribute']) {
                         $fields[$propertyName]['resolve'] = function ($object) use ($propertyName, $propertyMetadata) {
                             if (is_object($object) && isset($object->{$propertyName})) {

@@ -5,6 +5,10 @@ namespace Jav\ApiTopiaBundle;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\FavoriteProductsResolver;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\StatResolver;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\UserResolver;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObject2CollectionResolver;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObject2ItemResolver;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObjectCollectionResolver;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObjectItemResolver;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\Config\Loader\LoaderInterface;
@@ -58,6 +62,10 @@ class JavApiTopiaTestKernel extends BaseKernel
             $container->register(UserResolver::class)->addTag('apitopia.graphql_resolver');
             $container->register(FavoriteProductsResolver::class)->addTag('apitopia.graphql_resolver');
             $container->register(StatResolver::class)->addTag('apitopia.graphql_resolver');
+            $container->register(ApiResourceObjectItemResolver::class)->addTag('apitopia.graphql_resolver');
+            $container->register(ApiResourceObjectCollectionResolver::class)->addTag('apitopia.graphql_resolver');
+            $container->register(ApiResourceObject2ItemResolver::class)->addTag('apitopia.graphql_resolver');
+            $container->register(ApiResourceObject2CollectionResolver::class)->addTag('apitopia.graphql_resolver');
         });
     }
 }

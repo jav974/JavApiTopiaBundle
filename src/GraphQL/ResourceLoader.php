@@ -64,6 +64,7 @@ class ResourceLoader
                     ];
                 } catch (Throwable $e) {
                     $a = 1;
+                    throw $e;
                 }
             }
         }

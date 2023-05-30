@@ -46,7 +46,15 @@ class ReflectionUtils
     public static function getTypeFromDocComment(?string $docComment): ?string
     {
         if (preg_match('/@var\s+(\S+)/', $docComment ?? '', $matches)) {
-            return $matches[1];
+            $types = array_map('trim', explode("|", $matches[1]));
+
+            foreach ($types as $type) {
+                if (strtolower($type) !== 'null') {
+                    return $type;
+                }
+            }
+
+            return null;
         }
 
         return null;

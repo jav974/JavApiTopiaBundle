@@ -14,6 +14,11 @@ abstract class AbstractApiTestCase extends WebTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->setUpClient();
+    }
+
+    protected function setUpClient(): void
+    {
         $this->client = self::createClient([], [
             'CONTENT_TYPE' => 'multipart/form-data'
         ]);
