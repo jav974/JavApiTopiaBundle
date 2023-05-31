@@ -164,7 +164,7 @@ class ResolverProvider
         // They are base64 encoded integer, so we have to decode them in order to compute something
 
         if (isset($filters['last']) && isset($filters['before'])) {
-            $firstResult = ArrayConnection::cursorToOffset($filters['before']) - $filters['last'];
+            $firstResult = max(ArrayConnection::cursorToOffset($filters['before']) - $filters['last'], 0);
         } elseif (isset($filters['first']) && isset($filters['after'])) {
             $firstResult = ArrayConnection::cursorToOffset($filters['after']) + 1;
         } elseif (isset($filters['last'])) {

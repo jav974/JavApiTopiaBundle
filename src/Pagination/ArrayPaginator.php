@@ -2,9 +2,11 @@
 
 namespace Jav\ApiTopiaBundle\Pagination;
 
+use ArrayIterator;
+use IteratorAggregate;
 use Traversable;
 
-class ArrayPaginator implements \IteratorAggregate, PaginatorInterface
+class ArrayPaginator implements IteratorAggregate, PaginatorInterface
 {
     /** @var array<mixed> */
     private array $items;
@@ -42,6 +44,6 @@ class ArrayPaginator implements \IteratorAggregate, PaginatorInterface
 
     public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->getCurrentPageResults());
+        return new ArrayIterator($this->getCurrentPageResults());
     }
 }

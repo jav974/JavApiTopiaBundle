@@ -2,9 +2,11 @@
 
 namespace Jav\ApiTopiaBundle\Pagination;
 
+use ArrayIterator;
+use IteratorAggregate;
 use Traversable;
 
-class VirtualArrayPaginator implements \IteratorAggregate, PaginatorInterface
+class VirtualArrayPaginator implements IteratorAggregate, PaginatorInterface
 {
     /**
      * @param array<mixed> $results
@@ -33,11 +35,11 @@ class VirtualArrayPaginator implements \IteratorAggregate, PaginatorInterface
 
     public function getCurrentPageOffset(): int
     {
-        return $this->offset;
+        return $this->offset >= 0 ? $this->offset : $this->totalItems + $this->offset;
     }
 
     public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->getCurrentPageResults());
+        return new ArrayIterator($this->getCurrentPageResults());
     }
 }

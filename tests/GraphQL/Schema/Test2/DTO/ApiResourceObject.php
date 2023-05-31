@@ -70,14 +70,38 @@ class ApiResourceObject
     #[SubQuery(resolver: ApiResourceObject2ItemResolver::class, args: ['id' => ['type' => 'Int!']], description: "Get a nullable api resource sub object 2")]
     public ?ApiResourceObject2 $optionalApiResourceSubObjectAsSubQuery = null;
 
-    #[SubQueryCollection(resolver: ApiResourceObject2CollectionResolver::class, output: ApiResourceObject2::class, description: "Get a cursor based api resource sub object 2 collection")]
+    #[SubQueryCollection(
+        resolver: ApiResourceObject2CollectionResolver::class,
+        output: ApiResourceObject2::class,
+        description: "Get a cursor based api resource sub object 2 collection",
+        args: [
+            'howMany' => ['type' => 'Int'],
+            'returnType' => ['type' => 'String']
+        ]
+    )]
     public array $apiResourceSubObjectAsCursorBasedSubQueryCollection;
 
     /** @var ApiResourceObject2[] */
-    #[SubQueryCollection(resolver: ApiResourceObject2CollectionResolver::class, paginationType: 'offset', description: "Get an offset based api resource sub object 2 collection")]
+    #[SubQueryCollection(
+        resolver: ApiResourceObject2CollectionResolver::class,
+        paginationType: 'offset',
+        description: "Get an offset based api resource sub object 2 collection",
+        args: [
+            'howMany' => ['type' => 'Int'],
+            'returnType' => ['type' => 'String']
+        ]
+    )]
     public array $apiResourceSubObjectAsOffsetBasedSubQueryCollection;
 
     /** @var ApiResourceObject2[] */
-    #[SubQueryCollection(resolver: ApiResourceObject2CollectionResolver::class, paginationEnabled: false, description: "Get all api resource sub object 2 collection")]
+    #[SubQueryCollection(
+        resolver: ApiResourceObject2CollectionResolver::class,
+        paginationEnabled: false,
+        description: "Get all api resource sub object 2 collection",
+        args: [
+            'howMany' => ['type' => 'Int'],
+            'returnType' => ['type' => 'String']
+        ]
+    )]
     public array $apiResourceSubObjectAsNotPaginatedSubQueryCollection;
 }

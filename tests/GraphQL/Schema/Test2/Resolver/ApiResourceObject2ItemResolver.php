@@ -9,6 +9,9 @@ class ApiResourceObject2ItemResolver implements QueryItemResolverInterface
 {
     public function __invoke(array $context): object|array|null
     {
-        return new ApiResourceObject2(42);
+        return match ($context['info']->fieldName) {
+            'optionalApiResourceSubObjectAsSubQuery' => null,
+            default => new ApiResourceObject2(42)
+        };
     }
 }
