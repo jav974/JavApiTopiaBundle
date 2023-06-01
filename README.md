@@ -1,3 +1,5 @@
+![GitHub CI](https://github.com/jav974/JavApiTopiaBundle/actions/workflows/php.yml/badge.svg)
+
 Installation
 ============
 
