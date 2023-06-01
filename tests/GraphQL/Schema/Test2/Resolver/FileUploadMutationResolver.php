@@ -8,7 +8,6 @@ use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\DTO\Input\UploadInputObject;
 
 class FileUploadMutationResolver implements MutationResolverInterface
 {
-
     public function __invoke(array $context): object|array|null
     {
         return match ($context['info']->fieldName) {

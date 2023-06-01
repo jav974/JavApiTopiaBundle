@@ -47,8 +47,9 @@ class RequestHandler
             /** @var ExecutionResult|ExecutionResult[] $result */
             $result = $server->executePsrRequest($psrRequest);
             $jsonResult = json_encode($result, JSON_THROW_ON_ERROR);
+            $statusCode = !empty($result->errors) ? 500 : 200;
 
-            return new JsonResponse($jsonResult, 200, [], true);
+            return new JsonResponse($jsonResult, $statusCode, [], true);
         } catch (\Throwable $e) {
             return new JsonResponse(['errors' => [FormattedError::createFromException($e)]], 500);
         }

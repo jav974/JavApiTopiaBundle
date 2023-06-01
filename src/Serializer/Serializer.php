@@ -31,7 +31,6 @@ class Serializer
             new UploadedFileDenormalizer(),
             new ObjectNormalizer(classMetadataFactory: $classMetadataFactory, propertyTypeExtractor: $extractors),
             new ArrayDenormalizer(),
-//            new ObjectNormalizer(classMetadataFactory: $classMetadataFactory, propertyTypeExtractor: new ReflectionExtractor()),
         ];
         $this->serializer = new BaseSerializer($normalizers, $encoders);
     }

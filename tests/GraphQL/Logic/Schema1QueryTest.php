@@ -29,6 +29,7 @@ class Schema1QueryTest extends AbstractApiTestCase
             }
         ');
 
+        $this->assertResponseIsSuccessful();
         $this->assertGraph($response, [
             'data' => [
                 'user' => [

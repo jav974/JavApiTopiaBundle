@@ -54,6 +54,7 @@ class Schema2QueryTest extends AbstractApiTestCase
             }
         ');
 
+        $this->assertResponseIsSuccessful();
         $this->assertGraph($response, [
             'data' => [
                 'apiResourceObject' => [
@@ -136,6 +137,7 @@ class Schema2QueryTest extends AbstractApiTestCase
             }
         ');
 
+        $this->assertResponseIsSuccessful();
         $this->assertGraph($response, [
             'data' => [
                 'apiResourceObject' => [
@@ -265,6 +267,7 @@ class Schema2QueryTest extends AbstractApiTestCase
                 }
             }
 
+            $this->assertResponseIsSuccessful();
             $this->assertGraph($response, [
                 'data' => [
                     'apiResourceObject' => [
@@ -315,6 +318,7 @@ class Schema2QueryTest extends AbstractApiTestCase
                 ['paginatorType' => $paginatorType, 'howMany' => $howMany, 'offset' => $offset, 'limit' => $limit]
             );
 
+            $this->assertResponseIsSuccessful();
             $this->assertGraph($response, [
                 'data' => [
                     'apiResourceObject' => [
@@ -346,6 +350,7 @@ class Schema2QueryTest extends AbstractApiTestCase
             }
         ', ['paginatorType' => $paginatorType, 'howMany' => $howMany]);
 
+        $this->assertResponseIsSuccessful();
         $this->assertGraph($response, [
             'data' => [
                 'apiResourceObject' => [

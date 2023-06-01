@@ -28,6 +28,7 @@ class Schema2MutationTest extends AbstractApiTestCase
             }
         ');
 
+        $this->assertResponseIsSuccessful();
         $this->assertGraph($response, [
             'data' => [
                 'createSimpleWithInputObjectDeserialized' => [
@@ -64,6 +65,7 @@ class Schema2MutationTest extends AbstractApiTestCase
             }
         ');
 
+        $this->assertResponseIsSuccessful();
         $this->assertGraph($response, [
             'data' => [
                 'createSimpleWithInputObjectRaw' => [
@@ -102,6 +104,7 @@ class Schema2MutationTest extends AbstractApiTestCase
             }
         ');
 
+        $this->assertResponseIsSuccessful();
         $this->assertGraph($response, [
             'data' => [
                 'createSimpleWithInputObjectAsArg' => [
@@ -134,6 +137,7 @@ class Schema2MutationTest extends AbstractApiTestCase
             'file' => $this->getFile('test.txt')
         ]);
 
+        $this->assertResponseIsSuccessful();
         $this->assertGraph($response, [
             'data' => [
                 'createWithFileUploadInputAsArg' => [
@@ -185,6 +189,7 @@ class Schema2MutationTest extends AbstractApiTestCase
             'optionalFile2' => $this->getFile('optionalFile2.txt'),
         ]);
 
+        $this->assertResponseIsSuccessful();
         $this->assertGraph($response, [
             'data' => [
                 'createWithFileUploadInputDeserialized' => [
@@ -248,6 +253,7 @@ class Schema2MutationTest extends AbstractApiTestCase
             'optionalFile2' => $this->getFile('optionalFile2.txt'),
         ]);
 
+        $this->assertResponseIsSuccessful();
         $this->assertGraph($response, [
             'data' => [
                 'createWithFileUploadInputRaw' => [

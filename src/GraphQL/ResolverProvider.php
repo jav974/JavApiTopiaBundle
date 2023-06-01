@@ -41,10 +41,11 @@ class ResolverProvider
                 $context['info'] = $resolveInfo;
                 $context['schema'] = $schemaName;
 
-                $this->serializer->denormalizeInput($input);
-
                 if ($attribute->deserialize && $attribute->input) {
                     $input = $this->serializer->denormalize($input, $attribute->input);
+                } else {
+                    // Transforms Psr7 UploadedFile to Symfony UploadedFile
+                    $this->serializer->denormalizeInput($input);
                 }
 
                 $context['args']['input'] = $input;
