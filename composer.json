@@ -61,6 +61,7 @@
     {"type":  "vcs", "url":  "git@github.com:otzy/graphql-relay-php.git"}
   ],
   "scripts": {
-    "sniffer:php8": "phpcs -p ./src --standard=vendor/phpcompatibility/php-compatibility/PHPCompatibility --runtime-set testVersion 8.1"
+    "sniffer:php8": "phpcs -p ./src --standard=vendor/phpcompatibility/php-compatibility/PHPCompatibility --runtime-set testVersion 8.1",
+    "test": "vendor/bin/simple-phpunit"
   }
 }
