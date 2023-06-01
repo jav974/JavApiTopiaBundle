@@ -41,4 +41,9 @@ class UploadedFileDenormalizer implements DenormalizerInterface
     {
         return $type === UploadedFile::class && ($data instanceof UploadedFileInterface || $data instanceof UploadedFile);
     }
+
+    public function getSupportedTypes(?string $format): array
+    {
+        return [UploadedFile::class];
+    }
 }
