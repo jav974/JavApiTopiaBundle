@@ -45,7 +45,8 @@ class TypeResolver
         );
         $this->types['Node'] = $this->nodeDefinition['nodeInterface'];
         $this->types['PageInfo'] = Connection::pageInfoType();
-        $this->types['Upload'] = new UploadType();
+        $this->types['input.Upload'] = new UploadType();
+        $this->types['Upload'] =& $this->types['input.Upload'];
     }
 
     /**
@@ -58,13 +59,13 @@ class TypeResolver
 
     public function resolve(string $schemaName, string $classPath, bool $isCollection, bool $input = false): Type&NullableType
     {
-        if ($classPath === UploadedFile::class) {
-            return $this->types['Upload'] ??= new UploadType();
+        if (in_array($classPath, [UploadedFile::class, 'UploadedFile'])) {
+            $typeName = 'Upload';
         } elseif (in_array($classPath, [\DateTimeInterface::class, \DateTime::class, \DateTimeImmutable::class])) {
-            return Type::string();
+            $typeName = 'String';
+        } else {
+            $typeName = ReflectionUtils::getClassNameFromClassPath($classPath);
         }
-
-        $typeName = ReflectionUtils::getClassNameFromClassPath($classPath);
 
         if (in_array($typeName, ['int', 'float', 'string', 'boolean', 'bool', 'ID'])) {
             $typeName = $typeName === 'bool' ? 'boolean' : $typeName;
@@ -306,7 +307,7 @@ class TypeResolver
                 foreach ($reflectionClass->getProperties() as $reflectionProperty) {
                     $fieldInfo = ReflectionUtils::extractFieldInfoFromProperty($reflectionProperty);
                     $type = $this->resolveTypeFromSchema($fieldInfo['type'], $schemaName);
-                    $type = $this->resolve($schemaName, $type, false, !$fieldInfo['isBuiltin']);
+                    $type = $this->resolve($schemaName, $type, $fieldInfo['isCollection'], !$fieldInfo['isBuiltin']);
                     $fields[$reflectionProperty->getName()] = [
                         'type' => $fieldInfo['allowsNull'] ? $type : Type::nonNull($type),
                         'description' => $fieldInfo['description'],

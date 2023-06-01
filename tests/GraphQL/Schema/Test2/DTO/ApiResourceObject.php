@@ -3,14 +3,19 @@
 namespace Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\DTO;
 
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
+use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Mutation;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Query;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQuery;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQueryCollection;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\DTO\Input\SimpleInputObject;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\DTO\Input\UploadInputObject;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObject2CollectionResolver;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObject2ItemResolver;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObjectCollectionResolver;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObjectItemResolver;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\FileUploadMutationResolver;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\SimpleMutationResolver;
 
 #[ApiResource(
     graphQLOperations: [
@@ -25,7 +30,38 @@ use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObjectItem
             resolver: ApiResourceObjectCollectionResolver::class,
             description: "Get a cursor based api resource object collection"
         ),
-
+        new Mutation(
+            name: 'createSimpleWithInputObjectDeserialized',
+            resolver: SimpleMutationResolver::class,
+            input: SimpleInputObject::class,
+        ),
+        new Mutation(
+            name: 'createSimpleWithInputObjectRaw',
+            resolver: SimpleMutationResolver::class,
+            input: SimpleInputObject::class,
+            deserialize: false
+        ),
+        new Mutation(
+            name: 'createSimpleWithInputObjectAsArg',
+            resolver: SimpleMutationResolver::class,
+            args: ['theObject' => ['type' => 'SimpleInputObject!']] // Args are never deserialized
+        ),
+        new Mutation(
+            name: 'createWithFileUploadInputAsArg',
+            resolver: FileUploadMutationResolver::class,
+            args: ['theFile' => ['type' => 'Upload!']]
+        ),
+        new Mutation(
+            name: 'createWithFileUploadInputDeserialized',
+            resolver: FileUploadMutationResolver::class,
+            input: UploadInputObject::class,
+        ),
+        new Mutation(
+            name: 'createWithFileUploadInputRaw',
+            resolver: FileUploadMutationResolver::class,
+            input: UploadInputObject::class,
+            deserialize: false,
+        )
     ]
 )]
 class ApiResourceObject

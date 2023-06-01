@@ -35,7 +35,8 @@
     "symfony/mime": ">=5.4",
     "symfony/framework-bundle": ">=5.4",
     "symfony/twig-bundle": ">=5.4",
-    "doctrine/annotations": "^2.0"
+    "doctrine/annotations": "^2.0",
+    "phpdocumentor/reflection-docblock": "^5.3"
   },
   "require-dev": {
     "phpstan/phpstan": "^1.10",

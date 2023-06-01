@@ -6,10 +6,13 @@ use ArrayObject;
 use Jav\ApiTopiaBundle\GraphQL\ResourceLoader;
 use Psr\Http\Message\UploadedFileInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
 use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
+use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Encoder\XmlEncoder;
 use Symfony\Component\Serializer\Exception\ExceptionInterface;
+use Symfony\Component\Serializer\Normalizer\ArrayDenormalizer;
 use Symfony\Component\Serializer\Normalizer\DateTimeNormalizer;
 use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
 use Symfony\Component\Serializer\Serializer as BaseSerializer;
@@ -22,13 +25,13 @@ class Serializer
     {
         $classMetadataFactory = $this->resourceLoader->getClassMetatadaFactory();
         $encoders = [new JsonEncoder(), new XmlEncoder()];
+        $extractors = new PropertyInfoExtractor([], [new PhpDocExtractor(), new ReflectionExtractor()]);
         $normalizers = [
             new DateTimeNormalizer(),
             new UploadedFileDenormalizer(),
-            new ObjectNormalizer(
-                classMetadataFactory: $classMetadataFactory,
-                propertyTypeExtractor: new ReflectionExtractor()
-            )
+            new ObjectNormalizer(classMetadataFactory: $classMetadataFactory, propertyTypeExtractor: $extractors),
+            new ArrayDenormalizer(),
+//            new ObjectNormalizer(classMetadataFactory: $classMetadataFactory, propertyTypeExtractor: new ReflectionExtractor()),
         ];
         $this->serializer = new BaseSerializer($normalizers, $encoders);
     }

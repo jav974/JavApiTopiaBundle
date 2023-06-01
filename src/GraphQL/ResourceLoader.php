@@ -63,7 +63,6 @@ class ResourceLoader
                         'reflection' => $reflectionClass
                     ];
                 } catch (Throwable $e) {
-                    $a = 1;
                     throw $e;
                 }
             }

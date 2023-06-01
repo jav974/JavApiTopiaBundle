@@ -9,6 +9,8 @@ use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObject2Col
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObject2ItemResolver;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObjectCollectionResolver;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObjectItemResolver;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\FileUploadMutationResolver;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\SimpleMutationResolver;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\Config\Loader\LoaderInterface;
@@ -66,6 +68,8 @@ class JavApiTopiaTestKernel extends BaseKernel
             $container->register(ApiResourceObjectCollectionResolver::class)->addTag('apitopia.graphql_resolver');
             $container->register(ApiResourceObject2ItemResolver::class)->addTag('apitopia.graphql_resolver');
             $container->register(ApiResourceObject2CollectionResolver::class)->addTag('apitopia.graphql_resolver');
+            $container->register(SimpleMutationResolver::class)->addTag('apitopia.graphql_resolver');
+            $container->register(FileUploadMutationResolver::class)->addTag('apitopia.graphql_resolver');
         });
     }
 }
