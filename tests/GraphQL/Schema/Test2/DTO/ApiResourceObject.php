@@ -21,10 +21,10 @@ use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\SimpleMutationResolve
     graphQLOperations: [
         new Query(
             resolver: ApiResourceObjectItemResolver::class,
-            description: "Get a nullable api resource object",
             args: [
                 'id' => ['type' => 'Int!'],
-            ]
+            ],
+            description: "Get a nullable api resource object"
         ),
         new QueryCollection(
             resolver: ApiResourceObjectCollectionResolver::class,

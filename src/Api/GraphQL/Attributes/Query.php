@@ -8,8 +8,8 @@ class Query extends Attribute
     /**
      * @param array<string, array<string, string>>|null $args
      */
-    public function __construct(string $resolver, ?string $output = null, ?string $name = null, ?string $description = null, ?array $args = null)
+    public function __construct(string $resolver, ?string $output = null, ?string $name = null, ?array $args = null, ?string $description = null)
     {
-        parent::__construct($resolver, $output, $name, $description, $args);
+        parent::__construct($name, $resolver, $output, $args, $description);
     }
 }

@@ -14,6 +14,6 @@ class SubQuery extends Query
         ?string $output = null,
         ?string $description = null
     ) {
-        parent::__construct($resolver, $output, null, $description, $args);
+        parent::__construct($resolver, $output, null, $args, $description);
     }
 }

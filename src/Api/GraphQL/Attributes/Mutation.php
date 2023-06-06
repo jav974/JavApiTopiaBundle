@@ -13,10 +13,10 @@ class Mutation extends Attribute
         string $resolver,
         public ?string $input = null,
         ?string $output = null,
-        ?string $description = null,
         ?array $args = null,
+        ?string $description = null,
         public bool $deserialize = true
     ) {
-        parent::__construct($resolver, $output, $name, $description, $args);
+        parent::__construct($name, $resolver, $output, $args, $description);
     }
 }

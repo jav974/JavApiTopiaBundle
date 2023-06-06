@@ -3,8 +3,6 @@
 namespace Jav\ApiTopiaBundle;
 
 use Jav\ApiTopiaBundle\DependencyInjection\ApiTopiaExtension;
-use Jav\ApiTopiaBundle\DependencyInjection\Compiler\ResolverPass;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 
 class JavApiTopiaBundle extends Bundle
@@ -17,10 +15,5 @@ class JavApiTopiaBundle extends Bundle
     public function getContainerExtension(): ApiTopiaExtension
     {
         return new ApiTopiaExtension();
-    }
-
-    public function build(ContainerBuilder $container): void
-    {
-        $container->addCompilerPass(new ResolverPass());
     }
 }

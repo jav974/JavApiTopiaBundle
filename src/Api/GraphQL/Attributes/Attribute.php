@@ -2,15 +2,21 @@
 
 namespace Jav\ApiTopiaBundle\Api\GraphQL\Attributes;
 
-use Jav\ApiTopiaBundle\Api\Attributes\Attribute as BaseAttribute;
-
-abstract class Attribute extends BaseAttribute
+abstract class Attribute
 {
     /**
-     * @param array<string, array<string, string>>|null $args
+     * @param string|null $name The optional name of the endpoint (Will be generated if missing)
+     * @param string|null $resolver The resolver for this endpoint
+     * @param string|null $output The output type for this query (Put the desired FQN: Entity::class)
+     * @param array<string, array<string, string>>|null $args The arguments for this endpoint
+     * @param string|null $description An optional description that will be added to the generated schema
      */
-    public function __construct(public string $resolver, ?string $output = null, ?string $name = null, ?string $description = null, public ?array $args = null)
-    {
-        parent::__construct($output, $name, $description);
+    public function __construct(
+        public ?string $name = null,
+        public ?string $resolver = null,
+        public ?string $output = null,
+        public ?array $args = null,
+        public ?string $description = null
+    ) {
     }
 }

@@ -8,8 +8,8 @@ class Subscription extends Attribute
     /**
      * @param array<string, array<string, string>>|null $args
      */
-    public function __construct(string $name, ?string $resolver = null, ?string $output = null, ?string $description = null, ?array $args = null)
+    public function __construct(string $name, ?string $resolver = null, ?string $output = null, ?array $args = null, ?string $description = null)
     {
-        parent::__construct($resolver ?? '', $output, $name, $description, $args);
+        parent::__construct($name, $resolver, $output, $args, $description);
     }
 }

@@ -7,10 +7,6 @@ services:
     Jav\ApiTopiaBundle\Loader\RouteLoader:
         tags: [ routing.loader ]
 
-    Jav\ApiTopiaBundle\Rest\RequestHandler:
-        arguments: [ !tagged_locator { tag: 'apitopia.resolver' }, '@Jav\ApiTopiaBundle\Serializer\Serializer' ]
-        tags: [ controller.service_arguments ]
-
     Jav\ApiTopiaBundle\GraphQL\RequestHandler:
         arguments: [ '@Jav\ApiTopiaBundle\GraphQL\SchemaBuilder']
         tags: [ controller.service_arguments ]

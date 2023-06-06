@@ -20,6 +20,6 @@ class QueryCollection extends Query
         ?string $description = null,
         ?array $args = null
     ) {
-        parent::__construct($resolver, $output, $name, $description, $args);
+        parent::__construct($resolver, $output, $name, $args, $description);
     }
 }

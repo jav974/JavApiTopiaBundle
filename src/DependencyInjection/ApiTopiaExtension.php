@@ -7,7 +7,6 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\MutationResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\SubscriptionResolverInterface;
-use Jav\ApiTopiaBundle\Api\ResolverInterface;
 use Jav\ApiTopiaBundle\Controller\GraphiQLController;
 use Jav\ApiTopiaBundle\GraphQL\SchemaBuilder;
 use Jav\ApiTopiaBundle\Loader\RouteLoader;
@@ -24,8 +23,6 @@ class ApiTopiaExtension extends ConfigurableExtension
      */
     protected function loadInternal(array $mergedConfig, ContainerBuilder $container): void
     {
-        $container->registerForAutoconfiguration(ResolverInterface::class)
-            ->addTag('apitopia.resolver');
         $container->registerForAutoconfiguration(QueryItemResolverInterface::class)
             ->addTag('apitopia.graphql_resolver');
         $container->registerForAutoconfiguration(QueryCollectionResolverInterface::class)
