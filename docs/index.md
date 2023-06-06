@@ -51,8 +51,8 @@ Import apitopia routing configuration by adding these lines:
 // config/routes.yaml
 
 apitopia:
-  resource: .
-  type: apitopia
+    resource: .
+    type: apitopia
 ```
 This will import the routes defined in GraphQL endpoints configuration and graphiql endpoint.
 
@@ -68,14 +68,16 @@ Annotations provided are:
 - SubQueryCollection
 - Subscription
 
-The naming conventionand usage of this library is extremely similar to [ApiPlatform](https://api-platform.com/), so if you are familiar with it, you should feel right at home.
+The naming convention and usage of this library is extremely similar to [ApiPlatform](https://api-platform.com/), so if you are familiar with it, you should feel right at home.
 Key differences are:
 
 - Multi schemas support, each with their own endpoint
 - Full schema definition with PHP attributes, and reflection on DTOs (you may never need to write a custom type)
-- No (good) support for REST (yet?), but only GraphQL
+- Named queries, mutations and subscriptions are not suffixed with the class name (you can call them whatever you want)
+- Fully configurable subquery and subquery collection
+- Paginated collection resolvers are called with 'limit' and 'offset' arguments computed, even with cursor based pagination type
 - No ORM/DataSource integration, you have to provide your own data from the resolvers (but you can use anything you want inside them since they are services)
-
+- No support for REST (yet?), only GraphQL
 
 ## GraphQL:
 
