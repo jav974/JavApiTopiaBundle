@@ -13,6 +13,7 @@ use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\FileUploadMutationRes
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\SimpleMutationResolver;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Bundle\MercureBundle\MercureBundle;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
@@ -29,14 +30,17 @@ class JavApiTopiaTestKernel extends BaseKernel
     public function registerBundles(): iterable
     {
         return [
-            new JavApiTopiaBundle(),
             new FrameworkBundle(),
+            new MercureBundle(),
+            new JavApiTopiaBundle(),
         ];
     }
 
     public function registerContainerConfiguration(LoaderInterface $loader): void
     {
         $loader->load(function (ContainerBuilder $container) {
+            $container->setParameter('kernel.secret', 'apitopia_test');
+
             $container->loadFromExtension('framework', [
                 'test' => true,
                 'http_method_override' => false,
@@ -44,6 +48,20 @@ class JavApiTopiaTestKernel extends BaseKernel
                     'utf8' => true,
                     'type' => 'apitopia',
                     'resource' => '.'
+                ]
+            ]);
+
+            $container->loadFromExtension('mercure', [
+                'hubs' => [
+                    'default' => [
+                        'url' => 'http://localhost:8000/.well-known/mercure',
+                        'public_url' => 'http://localhost:8000/.well-known/mercure',
+                        'jwt' => [
+                            'secret' => '!ChangeThisMercureHubJWTSecretKey!',
+                            'publish' => '*',
+                            'subscribe' => '*'
+                        ]
+                    ]
                 ]
             ]);
 

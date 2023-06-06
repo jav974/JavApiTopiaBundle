@@ -36,7 +36,8 @@
     "symfony/framework-bundle": ">=5.4",
     "symfony/twig-bundle": ">=5.4",
     "doctrine/annotations": "^2.0",
-    "phpdocumentor/reflection-docblock": "^5.3"
+    "phpdocumentor/reflection-docblock": "^5.3",
+    "symfony/mercure-bundle": "^0.3.7"
   },
   "require-dev": {
     "phpstan/phpstan": "^1.10",
@@ -62,6 +63,7 @@
   ],
   "scripts": {
     "sniffer:php8": "phpcs -p ./src --standard=vendor/phpcompatibility/php-compatibility/PHPCompatibility --runtime-set testVersion 8.1",
-    "test": "XDEBUG_MODE=coverage vendor/bin/simple-phpunit --coverage-clover coverage.xml"
+    "phpstan": "phpstan",
+    "test": "XDEBUG_MODE=coverage simple-phpunit --coverage-clover coverage.xml"
   }
 }

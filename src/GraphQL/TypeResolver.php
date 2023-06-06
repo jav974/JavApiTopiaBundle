@@ -2,6 +2,9 @@
 
 namespace Jav\ApiTopiaBundle\GraphQL;
 
+use DateTime;
+use DateTimeImmutable;
+use DateTimeInterface;
 use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\ObjectType;
@@ -59,13 +62,11 @@ class TypeResolver
 
     public function resolve(string $schemaName, string $classPath, bool $isCollection, bool $input = false): Type&NullableType
     {
-        if (in_array($classPath, [UploadedFile::class, 'UploadedFile'])) {
-            $typeName = 'Upload';
-        } elseif (in_array($classPath, [\DateTimeInterface::class, \DateTime::class, \DateTimeImmutable::class])) {
-            $typeName = 'String';
-        } else {
-            $typeName = ReflectionUtils::getClassNameFromClassPath($classPath);
-        }
+        $typeName = match ($classPath) {
+            UploadedFile::class, 'UploadedFile' => 'Upload',
+            DateTimeInterface::class, DateTime::class, DateTimeImmutable::class => 'String',
+            default => ReflectionUtils::getClassNameFromClassPath($classPath),
+        };
 
         if (in_array($typeName, ['int', 'float', 'string', 'boolean', 'bool', 'ID'])) {
             $typeName = $typeName === 'bool' ? 'boolean' : $typeName;
@@ -166,7 +167,10 @@ class TypeResolver
                 $fields = [];
 
                 if ($isNodeInterface) {
-                    $fields['id'] = Relay::globalIdField("$schemaName.{$reflectionClass->getShortName()}", fn ($object) => is_object($object) ? $object->id : (is_array($object) ? $object['id'] : null));
+                    $fields['id'] = Relay::globalIdField(
+                        "$schemaName.{$reflectionClass->getShortName()}",
+                        fn ($object) => is_object($object) ? $object->id : (is_array($object) ? $object['id'] : null)
+                    );
                 }
 
                 foreach ($reflectionClass->getProperties() as $reflectionProperty) {

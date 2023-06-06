@@ -10,7 +10,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 
 class Client
 {
-    private CurlHttpClient $client;
+    protected CurlHttpClient $client;
 
     public function __construct()
     {

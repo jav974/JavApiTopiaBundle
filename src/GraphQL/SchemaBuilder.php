@@ -4,6 +4,7 @@ namespace Jav\ApiTopiaBundle\GraphQL;
 
 use GraphQL\Error\Error;
 use GraphQL\Error\SerializationError;
+use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type;
@@ -14,6 +15,7 @@ use InvalidArgumentException;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Mutation;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Query;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
+use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Subscription;
 use JsonException;
 use RuntimeException;
 use Throwable;
@@ -87,7 +89,7 @@ class SchemaBuilder
 
         $query = $this->buildQueryObject($schemaName);
         $mutation = $this->buildMutationObject($schemaName);
-        $subscription = null;//$this->buildSubscriptionObject($schemaName);
+        $subscription = $this->buildSubscriptionObject($schemaName);
 
         return new Schema([
             'query' => $query,
@@ -196,6 +198,83 @@ class SchemaBuilder
 
         return new ObjectType([
             'name' => 'Mutation',
+            'fields' => $fields
+        ]);
+    }
+
+    private function buildSubscriptionObject(string $schemaName): ?ObjectType
+    {
+        $resources = $this->resourceLoader->getResources($schemaName);
+        $fields = [];
+
+        foreach ($resources as $classPath => $resource) {
+            /** @var Subscription[] $subscriptions */
+            $subscriptions = $resource['subscriptions'];
+
+            foreach ($subscriptions as $subscription) {
+                $operationName = $subscription->name;
+
+                if (isset($fields[$operationName])) {
+                    throw new RuntimeException(sprintf('Duplicate operation name "%s" in Subscription schema "%s"', $operationName, $schemaName));
+                }
+
+                $outputType = $subscription->output ?? $classPath;
+                $fieldName = lcfirst(ReflectionUtils::getClassNameFromClassPath($classPath));
+
+                $payloadType = new ObjectType([
+                    'name' => $subscription->name . 'Payload',
+                    'fields' => [
+                        'mercureUrl' => [
+                            'type' => Type::nonNull(Type::string()),
+                            'resolve' => fn ($payload) => $payload['mercureUrl']
+                        ],
+                        'clientSubscriptionId' => [
+                            'type' => Type::string(),
+                            'resolve' => fn ($payload) => $payload['clientSubscriptionId']
+                        ],
+                        $fieldName => [
+                            'type' => $this->typeResolver->resolve($schemaName, $outputType, false),
+                            'resolve' => fn ($payload) => $payload['data']
+                        ]
+                    ]
+                ]);
+
+                $this->typeResolver->setType($schemaName, $payloadType->name, $payloadType);
+
+                $inputType = new InputObjectType([
+                    'name' => $subscription->name . 'Input',
+                    'fields' => [
+                        'id' => [
+                            'type' => Type::nonNull(Type::id()),
+                        ],
+                        'clientSubscriptionId' => [
+                            'type' => Type::string(),
+                        ],
+                    ] + $this->typeResolver->resolveAttributeArgs($schemaName, $subscription, true)
+                ]);
+
+                $this->typeResolver->setType($schemaName, $inputType->name, $inputType);
+
+                $args = [
+                    'input' => [
+                        'type' => Type::nonNull($inputType),
+                    ]
+                ];
+
+                $fields[$operationName] = [
+                    'type' => $payloadType,
+                    'args' => $args,
+                    'resolve' => $this->resolverProvider->getResolveCallback($schemaName, $subscription),
+                ];
+            }
+        }
+
+        if (empty($fields)) {
+            return null;
+        }
+
+        return new ObjectType([
+            'name' => 'Subscription',
             'fields' => $fields
         ]);
     }

@@ -9,6 +9,7 @@ use GraphQLRelay\Relay;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Mutation;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
+use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Subscription;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\MutationResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
@@ -20,7 +21,8 @@ class ResolverProvider
 {
     public function __construct(
         private readonly ServiceLocator $locator,
-        private readonly Serializer $serializer
+        private readonly Serializer $serializer,
+        private readonly MercureUrlGenerator $mercureUrlGenerator,
     ) {
     }
 
@@ -51,6 +53,20 @@ class ResolverProvider
                 $context['args']['input'] = $input;
 
                 return ['data' => $this->execResolver($attribute, $context)];
+            };
+        } elseif ($attribute instanceof Subscription) {
+            return function ($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute, $schemaName) {
+                $context = $context ?? [];
+                $context['info'] = $resolveInfo;
+                $context['schema'] = $schemaName;
+
+                $data = !empty($attribute->resolver) ? $this->execResolver($attribute, $context) : null;
+
+                return [
+                    'data' => $data,
+                    'mercureUrl' => $this->mercureUrlGenerator->generate($args['input']['id'], []),
+                    'clientSubscriptionId' => $args['input']['clientSubscriptionId'] ?? null,
+                ];
             };
         }
 
