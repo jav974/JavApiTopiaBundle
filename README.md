@@ -1,5 +1,6 @@
 ![GitHub CI](https://github.com/jav974/JavApiTopiaBundle/actions/workflows/php.yml/badge.svg)
 [![codecov](https://codecov.io/gh/jav974/JavApiTopiaBundle/branch/main/graph/badge.svg?token=AIL18WCO85)](https://codecov.io/gh/jav974/JavApiTopiaBundle)
+![Scrutinizer code quality (GitHub/Bitbucket)](https://img.shields.io/scrutinizer/quality/g/jav974/JavApiTopiaBundle)
 
 Installation
 ============

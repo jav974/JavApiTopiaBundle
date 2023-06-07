@@ -1,12 +1,11 @@
 {
   "type": "symfony-bundle",
   "name": "jav/apitopia-bundle",
-  "description": "APIs made simpler",
+  "description": "GraphQL APIs made simpler",
   "license": "MIT",
   "keywords": [
     "symfony",
     "api",
-    "rest",
     "graphql"
   ],
   "version": "1.0",
