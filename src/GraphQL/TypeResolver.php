@@ -33,6 +33,7 @@ class TypeResolver
         private readonly ResourceLoader $resourceLoader,
         private readonly ResolverProvider $resolverProvider,
         private readonly Serializer $serializer,
+        private readonly ReflectionUtils $reflectionUtils,
         private readonly ?NodeResolverInterface $nodeResolver = null
     ) {
         $this->types = Type::getStandardTypes();
@@ -158,12 +159,13 @@ class TypeResolver
     private function createObjectType(string $schemaName, ReflectionClass $reflectionClass): ObjectType
     {
         // If it is an ApiResource, make it available in the schema with Relay specification
-        $isNodeInterface = (bool)($reflectionClass->getAttributes(ApiResource::class)[0] ?? null);
+        $attribute = ($reflectionClass->getAttributes(ApiResource::class)[0] ?? null)?->newInstance();
+        $isNodeInterface = (bool)($attribute);
         $objectTypeData = [
             'name' => $reflectionClass->getShortName(),
-            'description' => ReflectionUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null),
+            'description' => $attribute?->description ?? ReflectionUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null),
             'fields' => function () use ($reflectionClass, $schemaName, $isNodeInterface) {
-                $metadata = $this->resourceLoader->getClassMetatadaFactory()->getMetadataFor($reflectionClass->getName())->getAttributesMetadata();
+                $properties = $this->reflectionUtils->extractFieldsInfoFromReflectionClass($reflectionClass);
                 $fields = [];
 
                 if ($isNodeInterface) {
@@ -173,14 +175,9 @@ class TypeResolver
                     );
                 }
 
-                foreach ($reflectionClass->getProperties() as $reflectionProperty) {
-                    $fieldInfo = ReflectionUtils::extractFieldInfoFromProperty($reflectionProperty);
+                foreach ($properties as $fieldInfo) {
                     $propertyName = $fieldInfo['name'];
-                    $propertyMetadata = $metadata[$propertyName];
-
-                    if ($propertyMetadata->isIgnored()) {
-                        continue;
-                    }
+                    $propertyMetadata = $fieldInfo['metadata'];
 
                     if ($propertyName === 'id' && $isNodeInterface) {
                         $propertyName = '_id';
@@ -202,7 +199,8 @@ class TypeResolver
                             if (is_object($object) && isset($object->{$propertyName})) {
                                 return $this->serializer->normalize(
                                     $object->{$propertyName},
-                                    $propertyMetadata->getNormalizationContexts()['*'] ?? []
+                                    null,
+                                    $propertyMetadata?->getNormalizationContexts()['*'] ?? []
                                 );
                             }
 
@@ -301,18 +299,17 @@ class TypeResolver
     private function createInputType(string $schemaName, ReflectionClass $reflectionClass): InputObjectType
     {
         $description = ReflectionUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null);
-
         $type = new InputObjectType([
             'name' => $reflectionClass->getShortName(),
             'description' => $description,
             'fields' => function () use ($reflectionClass, $schemaName) {
+                $properties = $this->reflectionUtils->extractFieldsInfoFromReflectionClass($reflectionClass);
                 $fields = [];
 
-                foreach ($reflectionClass->getProperties() as $reflectionProperty) {
-                    $fieldInfo = ReflectionUtils::extractFieldInfoFromProperty($reflectionProperty);
+                foreach ($properties as $fieldName => $fieldInfo) {
                     $type = $this->resolveTypeFromSchema($fieldInfo['type'], $schemaName);
                     $type = $this->resolve($schemaName, $type, $fieldInfo['isCollection'], !$fieldInfo['isBuiltin']);
-                    $fields[$reflectionProperty->getName()] = [
+                    $fields[$fieldName] = [
                         'type' => $fieldInfo['allowsNull'] ? $type : Type::nonNull($type),
                         'description' => $fieldInfo['description'],
                     ];

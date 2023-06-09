@@ -32,10 +32,12 @@ services:
         public: true
 
     Jav\ApiTopiaBundle\GraphQL\ResourceLoader: ~
+    Jav\ApiTopiaBundle\GraphQL\ReflectionUtils:
+        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader', '@Jav\ApiTopiaBundle\Serializer\Serializer' ]
     Jav\ApiTopiaBundle\GraphQL\Client: ~
     Jav\ApiTopiaBundle\GraphQL\ResolverProvider:
         arguments: [ !tagged_locator { tag: 'apitopia.graphql_resolver' }, '@Jav\ApiTopiaBundle\Serializer\Serializer', '@Jav\ApiTopiaBundle\GraphQL\MercureUrlGenerator' ]
     Jav\ApiTopiaBundle\GraphQL\TypeResolver:
-        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader', '@Jav\ApiTopiaBundle\GraphQL\ResolverProvider', '@Jav\ApiTopiaBundle\Serializer\Serializer' ]
+        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader', '@Jav\ApiTopiaBundle\GraphQL\ResolverProvider', '@Jav\ApiTopiaBundle\Serializer\Serializer', '@Jav\ApiTopiaBundle\GraphQL\ReflectionUtils' ]
     Jav\ApiTopiaBundle\GraphQL\MercureUrlGenerator:
         arguments: [ '@Symfony\Component\Mercure\HubRegistry', '@Symfony\Component\Mercure\Authorization', '@request_stack' ]

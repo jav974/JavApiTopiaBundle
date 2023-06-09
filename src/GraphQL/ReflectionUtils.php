@@ -4,60 +4,65 @@ namespace Jav\ApiTopiaBundle\GraphQL;
 
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQuery;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQueryCollection;
+use Jav\ApiTopiaBundle\Serializer\Serializer;
+use ReflectionClass;
+use ReflectionException;
 use ReflectionNamedType;
 use ReflectionProperty;
 
 class ReflectionUtils
 {
-    /**
-     * @return array<string, mixed>
-     */
-    public static function extractFieldInfoFromProperty(ReflectionProperty $reflectionProperty): array
-    {
-        $attribute = $reflectionProperty->getAttributes(SubQueryCollection::class)[0] ?? $reflectionProperty->getAttributes(SubQuery::class)[0] ?? null;
-        $comment = $reflectionProperty->getDocComment() ?: null;
-        /** @var SubQuery|SubQueryCollection|null $attributeInstance */
-        $attributeInstance = $attribute?->newInstance();
-        $reflectionType = $reflectionProperty->getType();
-        $type = null;
-
-        if ($reflectionType instanceof ReflectionNamedType) {
-            $type = $reflectionType->getName();
-        }
-
-        $isCollection = in_array($type ?? '', ['iterable', 'array']);
-        $docCommentType = self::getTypeFromDocComment($comment);
-        $isCollection = $isCollection || str_contains($docCommentType ?? '', '[]');
-        $docCommentType = $docCommentType ? str_replace('[]', '', $docCommentType) : null;
-        $type = $isCollection ? $attributeInstance?->output ?? $docCommentType ?? $type : $type;
-        $propertyName = $reflectionProperty->getName();
-
-        return [
-            'name' => $propertyName,
-            'description' => self::getDescriptionFromDocComment($comment),
-            'type' => $type,
-            'isCollection' => $isCollection,
-            'attribute' => $attributeInstance,
-            'allowsNull' => $reflectionType?->allowsNull() ?? true,
-            'isBuiltin' => $reflectionType instanceof ReflectionNamedType && $reflectionType->isBuiltin(),
-        ];
+    public function __construct(
+        private readonly ResourceLoader $resourceLoader,
+        private readonly Serializer $serializer
+    ) {
     }
 
-    public static function getTypeFromDocComment(?string $docComment): ?string
+    /**
+     * @param ReflectionClass<object> $reflectionClass
+     * @return array<string, mixed>
+     */
+    public function extractFieldsInfoFromReflectionClass(ReflectionClass $reflectionClass): array
     {
-        if (preg_match('/@var\s+(\S+)/', $docComment ?? '', $matches)) {
-            $types = array_map('trim', explode("|", $matches[1]));
+        $properties = $this->serializer->getPropertyInfoExtractor()->getProperties($reflectionClass->getName());
+        $properties = array_fill_keys($properties, null);
+        $metadata = $this->resourceLoader->getClassMetatadaFactory()->getMetadataFor($reflectionClass->getName())->getAttributesMetadata();
+        $propertyInfoExtractor = $this->serializer->getPropertyInfoExtractor();
 
-            foreach ($types as $type) {
-                if (strtolower($type) !== 'null') {
-                    return $type;
-                }
+        foreach ($properties as $name => &$info) {
+            $types = $propertyInfoExtractor->getTypes($reflectionClass->getName(), $name);
+            $type = $types[0] ?? null;
+
+            if ($type === null) {
+                continue;
             }
 
-            return null;
+            try {
+                $reflectionProperty = new ReflectionProperty($reflectionClass->getName(), $name);
+                $attribute = $reflectionProperty->getAttributes(SubQueryCollection::class)[0] ?? $reflectionProperty->getAttributes(SubQuery::class)[0] ?? null;
+                $isBuiltin = $reflectionProperty->getType() instanceof ReflectionNamedType && $reflectionProperty->getType()->isBuiltin();
+            } catch (ReflectionException) {
+                $attribute = null;
+                $isBuiltin = false;
+            }
+
+            $collectionValueType = $type->getCollectionValueTypes()[0] ?? null;
+            $innerType = !$type->isCollection() ? $type : $collectionValueType;
+
+            $info = [
+                'name' => $name,
+                'type' => $innerType->getClassName() ?? $innerType->getBuiltinType(),
+                'isCollection' => $type->isCollection(),
+                'allowsNull' => $type->isNullable(),
+                'description' => $propertyInfoExtractor->getLongDescription($reflectionClass->getName(), $name)
+                    ?? $propertyInfoExtractor->getShortDescription($reflectionClass->getName(), $name) ?? null,
+                'isBuiltin' => $isBuiltin,
+                'attribute' => $attribute?->newInstance(),
+                'metadata' => $metadata[$name] ?? null,
+            ];
         }
 
-        return null;
+        return $properties;
     }
 
     public static function getDescriptionFromDocComment(?string $docComment): ?string
