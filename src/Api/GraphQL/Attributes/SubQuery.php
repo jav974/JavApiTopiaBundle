@@ -12,7 +12,8 @@ class SubQuery extends Query
         string $resolver,
         array $args,
         ?string $output = null,
-        ?string $description = null
+        ?string $description = null,
+        public bool $deferred = false
     ) {
         parent::__construct($resolver, $output, null, $args, $description);
     }

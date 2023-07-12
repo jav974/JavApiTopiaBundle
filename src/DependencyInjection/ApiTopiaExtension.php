@@ -3,6 +3,7 @@
 namespace Jav\ApiTopiaBundle\DependencyInjection;
 
 use Exception;
+use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\DeferredResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\MutationResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
@@ -30,16 +31,17 @@ class ApiTopiaExtension extends ConfigurableExtension
         $container->registerForAutoconfiguration(MutationResolverInterface::class)
             ->addTag('apitopia.graphql_resolver');
         $container->registerForAutoconfiguration(SubscriptionResolverInterface::class)
-            ->addTag('apitopia.graphql_resolver')
-        ;
+            ->addTag('apitopia.graphql_resolver');
+        $container->registerForAutoconfiguration(DeferredResolverInterface::class)
+            ->addTag('apitopia.graphql_resolver');
 
         $loader = new YamlFileLoader($container, new FileLocator(__DIR__ . '/../../config'));
         $loader->load('services.yaml');
 
-        $container->getDefinition(SchemaBuilder::class)
+        $container
+            ->getDefinition(SchemaBuilder::class)
             ->addMethodCall('setConfig', [$mergedConfig['schemas'] ?? []])
-            ->addMethodCall('setSchemaOutputDirectory', [$mergedConfig['schema_output_dir']])
-        ;
+            ->addMethodCall('setSchemaOutputDirectory', [$mergedConfig['schema_output_dir']]);
 
         $graphQLEndpoints = [];
 
@@ -47,12 +49,12 @@ class ApiTopiaExtension extends ConfigurableExtension
             $graphQLEndpoints[$schemaName] = $schema['path'];
         }
 
-        $container->getDefinition(RouteLoader::class)
-            ->addMethodCall('setGraphQLEndpoints', [$graphQLEndpoints])
-        ;
+        $container
+            ->getDefinition(RouteLoader::class)
+            ->addMethodCall('setGraphQLEndpoints', [$graphQLEndpoints]);
 
-        $container->getDefinition(GraphiQLController::class)
-            ->setArgument('$endpoints', $graphQLEndpoints)
-        ;
+        $container
+            ->getDefinition(GraphiQLController::class)
+            ->setArgument('$endpoints', $graphQLEndpoints);
     }
 }

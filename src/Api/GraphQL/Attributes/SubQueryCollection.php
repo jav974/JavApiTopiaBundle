@@ -14,7 +14,8 @@ class SubQueryCollection extends QueryCollection
         ?string $paginationType = self::PAGINATION_TYPE_CURSOR,
         ?string $output = null,
         ?string $description = null,
-        ?array $args = null
+        ?array $args = null,
+        public bool $deferred = false
     ) {
         parent::__construct($resolver, $paginationEnabled, $paginationType, $output, null, $description, $args);
     }

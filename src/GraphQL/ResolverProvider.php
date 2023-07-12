@@ -3,22 +3,31 @@
 namespace Jav\ApiTopiaBundle\GraphQL;
 
 use Closure;
+use GraphQL\Deferred;
 use GraphQL\Type\Definition\ResolveInfo;
 use GraphQLRelay\Connection\ArrayConnection;
 use GraphQLRelay\Relay;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Mutation;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
+use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQuery;
+use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQueryCollection;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Subscription;
+use Jav\ApiTopiaBundle\Api\GraphQL\DeferredResults;
+use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\DeferredResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\MutationResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
 use Jav\ApiTopiaBundle\Pagination\PaginatorInterface;
 use Jav\ApiTopiaBundle\Serializer\Serializer;
+use RuntimeException;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 
 class ResolverProvider
 {
+    /** @var array<string, DeferredResults> */
+    private array $deferredBuffer = [];
+
     public function __construct(
         private readonly ServiceLocator $locator,
         private readonly Serializer $serializer,
@@ -29,10 +38,31 @@ class ResolverProvider
     public function getResolver(string $class): QueryItemResolverInterface|QueryCollectionResolverInterface|MutationResolverInterface
     {
         if (!$this->locator->has($class)) {
-            throw new \RuntimeException(sprintf('Resolver "%s" not found.', $class));
+            throw new RuntimeException(sprintf('Resolver "%s" not found.', $class));
         }
 
-        return $this->locator->get($class);
+        $resolver = $this->locator->get($class);
+
+        if ($resolver instanceof DeferredResolverInterface) {
+            throw new RuntimeException(sprintf('Resolver "%s" is a DeferredResolverInterface.', $class));
+        }
+
+        return $resolver;
+    }
+
+    public function getDeferredResolver(string $class): DeferredResolverInterface
+    {
+        if (!$this->locator->has($class)) {
+            throw new RuntimeException(sprintf('Resolver "%s" not found.', $class));
+        }
+
+        $resolver = $this->locator->get($class);
+
+        if (!$resolver instanceof DeferredResolverInterface) {
+            throw new RuntimeException(sprintf('Resolver "%s" is not a DeferredResolverInterface.', $class));
+        }
+
+        return $resolver;
     }
 
     public function getResolveCallback(string $schemaName, Attribute $attribute): Closure
@@ -72,12 +102,37 @@ class ResolverProvider
 
         return function ($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute, $schemaName) {
             $isPaginatedCollection = $attribute instanceof QueryCollection && $attribute->paginationEnabled;
+            $isDeferred = ($attribute instanceof SubQuery || $attribute instanceof SubQueryCollection) && $attribute->deferred;
             $context = $context ?? [];
             $context += $this->getQueryContext($resolveInfo, $schemaName, $root, $args, $isPaginatedCollection);
 
+            if ($isDeferred && $root) {
+                $rootClass = get_class($root);
+                $this->deferredBuffer[$rootClass] = $this->deferredBuffer[$rootClass] ?? new DeferredResults();
+                $this->deferredBuffer[$rootClass][$root] = $this->deferredBuffer[$rootClass][$root] ?? null;
+
+                return new Deferred(function () use ($attribute, $context, $rootClass, $root) {
+                    $unresolved = $this->deferredBuffer[$rootClass]->getUnresolvedParents();
+
+                    if (!empty($unresolved)) {
+                        $context['source'] = [
+                            'collection' => $unresolved,
+                            '#itemResourceClass' => $rootClass,
+                            '#itemIdentifiers' => [
+                                'id' => array_map(fn (object $object) => $object->id ?? null, $unresolved),
+                            ]
+                        ];
+
+                        $this->execResolver($attribute, $context, $this->deferredBuffer[$rootClass]);
+                    }
+
+                    return $this->deferredBuffer[$rootClass][$root];
+                });
+            }
+
             $data = $this->execResolver($attribute, $context);
 
-            if ($isPaginatedCollection) {
+            if ($isPaginatedCollection && $attribute instanceof QueryCollection) {
                 $data = $this->handlePaginatedCollection($attribute, $data, $args, $context);
             }
 
@@ -159,9 +214,16 @@ class ResolverProvider
     /**
      * @param array<string, mixed> $context
      */
-    private function execResolver(Attribute $attribute, array $context): mixed
+    private function execResolver(Attribute $attribute, array $context, ?DeferredResults $results = null): mixed
     {
-        return $this->getResolver($attribute->resolver)(context: $context);
+        if ($results !== null) {
+            $resolver = $this->getDeferredResolver($attribute->resolver);
+            $resolver(context: $context, results: $results);
+            return null;
+        } else {
+            $resolver = $this->getResolver($attribute->resolver);
+            return $resolver(context: $context);
+        }
     }
 
     /**

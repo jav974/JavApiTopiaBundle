@@ -2,6 +2,7 @@
 
 namespace Jav\ApiTopiaBundle\GraphQL;
 
+use RuntimeException;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Mercure\Authorization;
 use Symfony\Component\Mercure\HubRegistry;
@@ -9,7 +10,7 @@ use Symfony\Component\Mercure\HubRegistry;
 class MercureUrlGenerator
 {
     public function __construct(
-        private readonly HubRegistry $hubRegistry,
+        private readonly ?HubRegistry $hubRegistry = null,
         private readonly ?Authorization $authorization = null,
         private readonly ?RequestStack $requestStack = null
     ) {
@@ -17,9 +18,14 @@ class MercureUrlGenerator
 
     /**
      * @param array{hub?: string, subscribe?: string[]|string, publish?: string[]|string, additionalClaims?: array<string, mixed>, lastEventId?: string} $options The options to pass to the JWT factory
+     * @throws RuntimeException
      */
     public function generate(string $topic, array $options): string
     {
+        if ($this->hubRegistry === null) {
+            throw new RuntimeException('The Mercure hub registry is not configured.');
+        }
+
         $hub = $options['hub'] ?? null;
         $url = $this->hubRegistry->getHub($hub)->getPublicUrl();
         $url .= '?topic='.rawurlencode($topic);

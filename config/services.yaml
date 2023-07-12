@@ -40,4 +40,4 @@ services:
     Jav\ApiTopiaBundle\GraphQL\TypeResolver:
         arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader', '@Jav\ApiTopiaBundle\GraphQL\ResolverProvider', '@Jav\ApiTopiaBundle\Serializer\Serializer', '@Jav\ApiTopiaBundle\GraphQL\ReflectionUtils' ]
     Jav\ApiTopiaBundle\GraphQL\MercureUrlGenerator:
-        arguments: [ '@Symfony\Component\Mercure\HubRegistry', '@Symfony\Component\Mercure\Authorization', '@request_stack' ]
+        arguments: [ '@?Symfony\Component\Mercure\HubRegistry', '@?Symfony\Component\Mercure\Authorization', '@request_stack' ]
