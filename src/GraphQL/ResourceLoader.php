@@ -18,7 +18,7 @@ class ResourceLoader
     private static array $resources = [];
     private static ClassMetadataFactoryInterface $classMetadataFactory;
 
-    public function __construct()
+    public function __construct(private readonly string $cacheDir)
     {
         self::$classMetadataFactory = new ClassMetadataFactory(new AnnotationLoader(new AnnotationReader()));
     }
@@ -31,9 +31,24 @@ class ResourceLoader
     /**
      * @param string[] $resourceDirectories
      */
-    public function loadResources(string $schemaName, array $resourceDirectories): void
+    public function loadResources(string $schemaName, array $resourceDirectories, bool $invalidateCache = false): void
     {
         if (isset(self::$resources[$schemaName])) {
+            return ;
+        }
+
+        if (!is_dir("$this->cacheDir/apitopia")) {
+            mkdir("$this->cacheDir/apitopia", 0777, true);
+        }
+
+        $resourcesCacheFilename = "$this->cacheDir/apitopia/resources.$schemaName.php";
+
+        if ($invalidateCache) {
+            @unlink($resourcesCacheFilename);
+        }
+
+        if (file_exists($resourcesCacheFilename)) {
+            self::$resources[$schemaName] = unserialize(file_get_contents($resourcesCacheFilename));
             return ;
         }
 
@@ -60,13 +75,14 @@ class ResourceLoader
                         'query_collections' => $queryCollections,
                         'mutations' => $apiResource?->mutations ?? [],
                         'subscriptions' => $apiResource?->subscriptions ?? [],
-                        'reflection' => $reflectionClass
                     ];
                 } catch (Throwable $e) {
                     throw $e;
                 }
             }
         }
+
+        file_put_contents($resourcesCacheFilename, serialize(self::$resources[$schemaName]));
     }
 
     /**
@@ -82,7 +98,13 @@ class ResourceLoader
      */
     public function getReflectionClass(string $schemaName, string $classPath): ?ReflectionClass
     {
-        return self::$resources[$schemaName][$classPath]['reflection'] ?? null;
+        if (isset(self::$resources[$schemaName][$classPath])) {
+            return self::$resources[$schemaName][$classPath]['reflection'] ??= self::$classMetadataFactory
+                ->getMetadataFor($classPath)
+                ->getReflectionClass();
+        }
+
+        return null;
     }
 
     /**
@@ -90,8 +112,9 @@ class ResourceLoader
      */
     public function getResourceByClassName(string $schemaName, string $className): ?array
     {
-        foreach (self::$resources[$schemaName] ?? [] as $resource) {
+        foreach (self::$resources[$schemaName] ?? [] as $classPath => &$resource) {
             if ($resource['name'] === $className) {
+                $resource['reflection'] = $this->getReflectionClass($schemaName, $classPath);
                 return $resource;
             }
         }

@@ -8,6 +8,7 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\MutationResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\SubscriptionResolverInterface;
+use Jav\ApiTopiaBundle\Cache\ResourcesWarmer;
 use Jav\ApiTopiaBundle\Controller\GraphiQLController;
 use Jav\ApiTopiaBundle\GraphQL\SchemaBuilder;
 use Jav\ApiTopiaBundle\Loader\RouteLoader;
@@ -42,6 +43,10 @@ class ApiTopiaExtension extends ConfigurableExtension
             ->getDefinition(SchemaBuilder::class)
             ->addMethodCall('setConfig', [$mergedConfig['schemas'] ?? []])
             ->addMethodCall('setSchemaOutputDirectory', [$mergedConfig['schema_output_dir']]);
+
+        $container
+            ->getDefinition(ResourcesWarmer::class)
+            ->addMethodCall('setConfig', [$mergedConfig['schemas'] ?? []]);
 
         $graphQLEndpoints = [];
 

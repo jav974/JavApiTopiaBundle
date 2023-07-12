@@ -122,7 +122,7 @@ class TypeResolver
     {
         $field = [];
         $outputClassName = ReflectionUtils::getClassNameFromClassPath($classPath);
-        $type = $this->resolveTypeFromSchema($outputClassName, $schemaName);
+        $type = $this->resolveTypeFromSchema($classPath, $schemaName);
         $type = $this->resolve($schemaName, $type, $isCollection);
 
         if (!$allowsNull) {

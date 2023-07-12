@@ -31,7 +31,8 @@ services:
         arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader', '@Jav\ApiTopiaBundle\GraphQL\TypeResolver', '@Jav\ApiTopiaBundle\GraphQL\ResolverProvider' ]
         public: true
 
-    Jav\ApiTopiaBundle\GraphQL\ResourceLoader: ~
+    Jav\ApiTopiaBundle\GraphQL\ResourceLoader:
+        arguments: [ '%kernel.cache_dir%' ]
     Jav\ApiTopiaBundle\GraphQL\ReflectionUtils:
         arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader', '@Jav\ApiTopiaBundle\Serializer\Serializer' ]
     Jav\ApiTopiaBundle\GraphQL\Client: ~
@@ -41,3 +42,7 @@ services:
         arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader', '@Jav\ApiTopiaBundle\GraphQL\ResolverProvider', '@Jav\ApiTopiaBundle\Serializer\Serializer', '@Jav\ApiTopiaBundle\GraphQL\ReflectionUtils' ]
     Jav\ApiTopiaBundle\GraphQL\MercureUrlGenerator:
         arguments: [ '@?Symfony\Component\Mercure\HubRegistry', '@?Symfony\Component\Mercure\Authorization', '@request_stack' ]
+    Jav\ApiTopiaBundle\Cache\ResourcesWarmer:
+        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader' ]
+        tags:
+            - { name: kernel.cache_warmer }
