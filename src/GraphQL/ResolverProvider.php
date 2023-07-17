@@ -216,6 +216,10 @@ class ResolverProvider
      */
     private function execResolver(Attribute $attribute, array $context, ?DeferredResults $results = null): mixed
     {
+        if ($attribute->resolver === null) {
+            throw new RuntimeException(sprintf('Resolver for attribute "%s" cannot be null', $attribute->name));
+        }
+
         if ($results !== null) {
             $resolver = $this->getDeferredResolver($attribute->resolver);
             $resolver(context: $context, results: $results);

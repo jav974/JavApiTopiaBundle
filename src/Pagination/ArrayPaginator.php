@@ -39,7 +39,7 @@ class ArrayPaginator implements IteratorAggregate, PaginatorInterface
 
     public function getCurrentPageOffset(): int
     {
-        return array_key_first($this->items);
+        return array_key_first($this->items) ?? 0;
     }
 
     public function getIterator(): Traversable

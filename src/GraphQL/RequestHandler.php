@@ -8,6 +8,7 @@ use GraphQL\Executor\ExecutionResult;
 use GraphQL\Server\ServerConfig;
 use GraphQL\Server\StandardServer;
 use GraphQL\Upload\UploadMiddleware;
+use JsonException;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Psr\Http\Message\ServerRequestInterface;
 use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
@@ -55,11 +56,14 @@ class RequestHandler
         }
     }
 
+    /**
+     * @throws JsonException
+     */
     private function handleApplicationGraphql(ServerRequestInterface $request): ServerRequestInterface
     {
         return $request
             ->withHeader('content-type', 'application/json')
-            ->withParsedBody(json_decode($request->getBody()->getContents(), true, JSON_THROW_ON_ERROR));
+            ->withParsedBody(json_decode($request->getBody()->getContents(), true, flags: JSON_THROW_ON_ERROR));
     }
 
     private function handleMultipartFormData(ServerRequestInterface $request): ServerRequestInterface
@@ -67,8 +71,11 @@ class RequestHandler
         return (new UploadMiddleware())->processRequest($request);
     }
 
+    /**
+     * @throws JsonException
+     */
     private function handleApplicationJson(ServerRequestInterface $request): ServerRequestInterface
     {
-        return $request->withParsedBody(json_decode($request->getBody()->getContents(), true, JSON_THROW_ON_ERROR));
+        return $request->withParsedBody(json_decode($request->getBody()->getContents(), true, flags: JSON_THROW_ON_ERROR));
     }
 }

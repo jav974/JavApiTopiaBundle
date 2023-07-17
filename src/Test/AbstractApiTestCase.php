@@ -2,14 +2,15 @@
 
 namespace Jav\ApiTopiaBundle\Test;
 
-use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Jav\ApiTopiaBundle\GraphQL\Client;
+use JsonException;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Response;
 
 abstract class AbstractApiTestCase extends WebTestCase
 {
-    protected KernelBrowser $client;
+    protected Client $client;
 
     protected function setUp(): void
     {
@@ -19,57 +20,23 @@ abstract class AbstractApiTestCase extends WebTestCase
 
     protected function setUpClient(): void
     {
-        $this->client = self::createClient([], [
+        $kernelBrowser = self::createClient([], [
             'CONTENT_TYPE' => 'multipart/form-data'
         ]);
+        $this->client = new Client($kernelBrowser);
     }
 
     /**
      * @param array<string, mixed> $variables
      * @param UploadedFile[] $files
      * @return array<mixed>
+     * @throws JsonException
      */
     protected function graphQL(string $uri, string $gql, array $variables = [], array $files = []): array
     {
-        $_files = [];
-        $i = 0;
-        $query = ['operations' => ['query' => $gql], 'map' => []];
+        $response = $this->client->request($uri, $gql, $variables, $files);
 
-        foreach ($files as $fileParamName => $file) {
-            $variables[$fileParamName] = null;
-            $query['map']["$i"] = ["variables.$fileParamName"];
-            $_files[$i] = $file;
-            ++$i;
-        }
-
-        if (!empty($variables)) {
-            $query['operations']['variables'] = $variables;
-        }
-
-        $query['operations'] = json_encode($query['operations']);
-        $query['map'] = json_encode($query['map']);
-
-        $this->client->request(
-            'POST',
-            $uri,
-            $query,
-            $_files
-        );
-
-        return $this->getJsonResponse();
-    }
-
-    protected function getResponse(): Response
-    {
-        return $this->client->getResponse();
-    }
-
-    /**
-     * @return array<mixed>
-     */
-    protected function getJsonResponse(): array
-    {
-        return json_decode($this->getResponse()->getContent(), true);
+        return json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
     }
 
     /**

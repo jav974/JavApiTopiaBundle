@@ -370,18 +370,8 @@ class TypeResolver
         return $args;
     }
 
-    private function resolveTypeFromSchema(?string $type, string $schemaName): ?string
+    private function resolveTypeFromSchema(string $type, string $schemaName): string
     {
-        if (!$type) {
-            return null;
-        }
-
-        $reflectionClass = $this->resourceLoader->getReflectionClass($schemaName, $type);
-
-        if (!$reflectionClass) {
-            $reflectionClass = $this->resourceLoader->getResourceByClassName($schemaName, $type)['reflection'] ?? null;
-        }
-
-        return $reflectionClass?->getName() ?? $type;
+        return $this->resourceLoader->getReflectionClass($schemaName, $type)?->getName() ?? $type;
     }
 }

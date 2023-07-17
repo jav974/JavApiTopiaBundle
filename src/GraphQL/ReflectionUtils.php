@@ -25,7 +25,7 @@ class ReflectionUtils
     public function extractFieldsInfoFromReflectionClass(ReflectionClass $reflectionClass): array
     {
         $properties = $this->serializer->getPropertyInfoExtractor()->getProperties($reflectionClass->getName());
-        $properties = array_fill_keys($properties, null);
+        $properties = array_fill_keys($properties ?? [], null);
         $metadata = $this->resourceLoader->getClassMetatadaFactory()->getMetadataFor($reflectionClass->getName())->getAttributesMetadata();
         $propertyInfoExtractor = $this->serializer->getPropertyInfoExtractor();
 
@@ -51,7 +51,7 @@ class ReflectionUtils
 
             $info = [
                 'name' => $name,
-                'type' => $innerType->getClassName() ?? $innerType->getBuiltinType(),
+                'type' => $innerType?->getClassName() ?? $innerType?->getBuiltinType() ?? 'string',
                 'isCollection' => $type->isCollection(),
                 'allowsNull' => $type->isNullable(),
                 'description' => $propertyInfoExtractor->getLongDescription($reflectionClass->getName(), $name)
