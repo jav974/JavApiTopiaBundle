@@ -2,7 +2,9 @@
 
 namespace Jav\ApiTopiaBundle\Api\GraphQL;
 
-class DeferredResults implements \ArrayAccess
+use ArrayAccess;
+
+class DeferredResults implements ArrayAccess
 {
     /** @var array<int, object[]>> */
     private array $results = [];
@@ -36,7 +38,10 @@ class DeferredResults implements \ArrayAccess
         return $this->getOffsetForParent($offset) !== false;
     }
 
-    public function offsetGet(mixed $offset): mixed
+    /**
+     * @return object|object[]|null
+     */
+    public function offsetGet(mixed $offset): object|array|null
     {
         foreach ($this->results as $result) {
             if ($result[0] === $offset) {
@@ -47,6 +52,9 @@ class DeferredResults implements \ArrayAccess
         return null;
     }
 
+    /**
+     * @param object|object[]|null $value
+     */
     public function offsetSet(mixed $offset, mixed $value): void
     {
         $offsetForParent = $this->getOffsetForParent($offset);
@@ -58,6 +66,9 @@ class DeferredResults implements \ArrayAccess
         }
     }
 
+    /**
+     * @param object $offset
+     */
     public function offsetUnset(mixed $offset): void
     {
         foreach ($this->results as $key => $result) {

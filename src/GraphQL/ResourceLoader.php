@@ -43,8 +43,8 @@ class ResourceLoader
 
         $resourcesCacheFilename = "$this->cacheDir/apitopia/resources.$schemaName.php";
 
-        if ($invalidateCache) {
-            @unlink($resourcesCacheFilename);
+        if ($invalidateCache && file_exists($resourcesCacheFilename)) {
+            unlink($resourcesCacheFilename);
         }
 
         if (file_exists($resourcesCacheFilename)) {
@@ -76,8 +76,8 @@ class ResourceLoader
                         'mutations' => $apiResource?->mutations ?? [],
                         'subscriptions' => $apiResource?->subscriptions ?? [],
                     ];
-                } catch (Throwable $e) {
-                    throw $e;
+                } catch (Throwable) {
+                    // We might have a file that is not a resource, not even a class, so we just ignore it
                 }
             }
         }
