@@ -41,3 +41,4 @@ jobs:
                 with:
                     token: ${{ secrets.CODECOV_TOKEN }}
                     verbose: true
+                if: matrix.operating-system == 'ubuntu-latest' && matrix.php == '8.1' && matrix.symfony == '5.4'
