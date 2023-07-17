@@ -38,8 +38,8 @@ class MercureUrlGenerator
             null === $this->authorization ||
             null === $this->requestStack ||
             (!isset($options['subscribe']) && !isset($options['publish']) && !isset($options['additionalClaims'])) ||
-            /* @phpstan-ignore-next-line */
-            null === $request = method_exists($this->requestStack, 'getMainRequest') ? $this->requestStack->getMainRequest() : $this->requestStack->getMasterRequest()
+            null === $request = method_exists($this->requestStack, 'getMainRequest') ? $this->requestStack->getMainRequest()
+                : (method_exists($this->requestStack, 'getMasterRequest') ? $this->requestStack->getMasterRequest() : null)
         ) {
             return $url;
         }

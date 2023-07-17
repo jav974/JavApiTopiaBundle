@@ -8,7 +8,7 @@ use Traversable;
 
 class ArrayPaginator implements IteratorAggregate, PaginatorInterface
 {
-    /** @var array<mixed> */
+    /** @var array<int, mixed> */
     private array $items;
 
     private int $totalItems;
