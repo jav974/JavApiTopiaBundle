@@ -63,6 +63,9 @@
   "scripts": {
     "sniffer:php8": "phpcs -p ./src --standard=vendor/phpcompatibility/php-compatibility/PHPCompatibility --runtime-set testVersion 8.1",
     "phpstan": "phpstan",
-    "test": "XDEBUG_MODE=coverage simple-phpunit --coverage-clover coverage.xml"
+    "test": [
+      "@putenv XDEBUG_MODE=coverage",
+      "simple-phpunit --coverage-clover coverage.xml"
+    ]
   }
 }
