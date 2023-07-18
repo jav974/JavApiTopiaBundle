@@ -59,7 +59,7 @@ services:
 
     jav_apitopia.graphql.type_resolver:
         class: Jav\ApiTopiaBundle\GraphQL\TypeResolver
-        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.graphql.resolver_provider', '@jav_apitopia.serializer.serializer', '@jav_apitopia.graphql.reflection_utils' ]
+        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.graphql.resolver_provider', '@jav_apitopia.serializer.serializer', '@jav_apitopia.graphql.reflection_utils', '@jav_apitopia.graphql.type_registry' ]
 
     jav_apitopia.graphql.mercure_url_generator:
         class: Jav\ApiTopiaBundle\GraphQL\MercureUrlGenerator
@@ -70,3 +70,6 @@ services:
         arguments: [ '@jav_apitopia.graphql.resource_loader' ]
         tags:
             - { name: kernel.cache_warmer }
+
+    jav_apitopia.graphql.type_registry:
+        class: Jav\ApiTopiaBundle\GraphQL\TypeRegistry

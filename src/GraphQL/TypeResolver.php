@@ -10,10 +10,7 @@ use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Definition\WrappingType;
-use GraphQL\Upload\UploadType;
-use GraphQLRelay\Connection\Connection;
 use GraphQLRelay\Relay;
-use InvalidArgumentException;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
 use Jav\ApiTopiaBundle\Serializer\Serializer;
@@ -24,8 +21,6 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class TypeResolver
 {
-    /** @var array<string, Type&NullableType> */
-    private array $types;
     /** @var array<string, Type&NullableType>  */
     private array $nodeDefinition;
 
@@ -34,9 +29,9 @@ class TypeResolver
         private readonly ResolverProvider $resolverProvider,
         private readonly Serializer $serializer,
         private readonly ReflectionUtils $reflectionUtils,
+        private readonly TypeRegistry $typeRegistry,
         private readonly ?NodeResolverInterface $nodeResolver = null
     ) {
-        $this->types = Type::getStandardTypes();
         $this->nodeDefinition = Relay::nodeDefinitions(
             function ($globalId) {
                 $idComponents = Relay::fromGlobalId($globalId);
@@ -47,10 +42,7 @@ class TypeResolver
                 return null;
             }
         );
-        $this->types['Node'] = $this->nodeDefinition['nodeInterface'];
-        $this->types['PageInfo'] = Connection::pageInfoType();
-        $this->types['input.Upload'] = new UploadType();
-        $this->types['Upload'] =& $this->types['input.Upload'];
+        $this->typeRegistry->register('Node', $this->nodeDefinition['nodeInterface']);
     }
 
     /**
@@ -78,8 +70,8 @@ class TypeResolver
             $typeName = "input.$typeName";
         }
 
-        if (!isset($this->types[$typeName]) && !isset($this->types["$schemaName.$typeName"])) {
-            $this->types["$schemaName.$typeName"] = $this->createType($schemaName, $classPath, $input);
+        if (!$this->typeRegistry->has($typeName) && !$this->typeRegistry->has("$schemaName.$typeName")) {
+            $this->typeRegistry->register("$schemaName.$typeName", $this->createType($schemaName, $classPath, $input));
         }
 
         $type = $this->getType($typeName, $schemaName);
@@ -93,15 +85,15 @@ class TypeResolver
 
     public function getType(string $name, ?string $schemaName = null): Type&NullableType
     {
-        if (isset($this->types[$name])) {
-            return $this->types[$name];
+        if ($this->typeRegistry->has($name)) {
+            return $this->typeRegistry->get($name);
         }
 
         if ($schemaName !== null) {
             $name = "$schemaName.$name";
         }
 
-        return $this->types[$name] ?? throw new InvalidArgumentException(sprintf('Type "%s" not found.', $name));
+        return $this->typeRegistry->get($name);
     }
 
     private function createType(string $schemaName, string $classPath, bool $input = false): Type&NullableType
@@ -219,7 +211,7 @@ class TypeResolver
 
         $type = new ObjectType($objectTypeData);
 
-        $this->types[$schemaName . '.' . $reflectionClass->getShortName()] = $type;
+        $this->typeRegistry->register($schemaName . '.' . $reflectionClass->getShortName(), $type);
 
         return $type;
     }
@@ -232,21 +224,25 @@ class TypeResolver
 
         $connectionName = $outputClassName . 'OffsetConnection';
 
+        if (!$this->typeRegistry->has("$schemaName.$connectionName")) {
+            $this->typeRegistry->register("$schemaName.$connectionName", new ObjectType([
+                'name' => $connectionName,
+                'fields' => [
+                    'items' => [
+                        'type' => Type::listOf($type),
+                        'description' => 'The list of items in the connection.',
+                    ],
+                    'totalCount' => [
+                        'type' => Type::nonNull(Type::int()),
+                        'description' => 'The total count of items in the connection.',
+                        'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
+                    ],
+                ],
+            ]));
+        }
+
         // @phpstan-ignore-next-line
-        return $this->types["$schemaName.$connectionName"] ??= new ObjectType([
-            'name' => $connectionName,
-            'fields' => [
-                'items' => [
-                    'type' => Type::listOf($type),
-                    'description' => 'The list of items in the connection.',
-                ],
-                'totalCount' => [
-                    'type' => Type::nonNull(Type::int()),
-                    'description' => 'The total count of items in the connection.',
-                    'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
-                ],
-            ],
-        ]);
+        return $this->typeRegistry->get("$schemaName.$connectionName");
     }
 
     /**
@@ -273,24 +269,32 @@ class TypeResolver
         $edgeName = $outputClassName . 'Edge';
         $connectionName = $outputClassName . 'CursorConnection';
 
-        $edge = $this->types["$schemaName.$edgeName"] ??= Relay::edgeType([
-            'nodeType' => $type,
-            'name' => $outputClassName,
-        ]);
+        if (!$this->typeRegistry->has("$schemaName.$edgeName")) {
+            $this->typeRegistry->register("$schemaName.$edgeName", Relay::edgeType([
+                'nodeType' => $type,
+                'name' => $outputClassName,
+            ]));
+        }
+
+        $edge = $this->typeRegistry->get("$schemaName.$edgeName");
+
+        if (!$this->typeRegistry->has("$schemaName.$connectionName")) {
+            $this->typeRegistry->register("$schemaName.$connectionName", Relay::connectionType([
+                'nodeType' => $type,
+                'edgeType' => $edge,
+                'connectionFields' => [
+                    'totalCount' => [
+                        'type' => Type::nonNull(Type::int()),
+                        'description' => 'The total count of items in the connection.',
+                        'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
+                    ],
+                ],
+                'name' => $outputClassName . 'Cursor'
+            ]));
+        }
 
         // @phpstan-ignore-next-line
-        return $this->types["$schemaName.$connectionName"] ??= Relay::connectionType([
-            'nodeType' => $type,
-            'edgeType' => $edge,
-            'connectionFields' => [
-                'totalCount' => [
-                    'type' => Type::nonNull(Type::int()),
-                    'description' => 'The total count of items in the connection.',
-                    'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
-                ],
-            ],
-            'name' => $outputClassName . 'Cursor'
-        ]);
+        return $this->typeRegistry->get("$schemaName.$connectionName");
     }
 
     /**
@@ -319,14 +323,14 @@ class TypeResolver
             },
         ]);
 
-        $this->types[$schemaName . '.' . $reflectionClass->getShortName()] = $type;
+        $this->typeRegistry->register($schemaName . '.' . $reflectionClass->getShortName(), $type);
 
         return $type;
     }
 
     public function setType(string $schemaName, string $name, Type&NullableType $type): void
     {
-        $this->types["$schemaName.$name"] = $type;
+        $this->typeRegistry->register("$schemaName.$name", $type);
     }
 
     /**
@@ -347,10 +351,10 @@ class TypeResolver
                 $allowsNull = true;
             }
 
-            if (isset($this->types[$type])) {
-                $type = $this->types[$type];
-            } elseif (isset($this->types["$schemaName.$type"])) {
-                $type = $this->types["$schemaName.$type"];
+            if ($this->typeRegistry->has($type)) {
+                $type = $this->typeRegistry->get($type);
+            } elseif ($this->typeRegistry->has("$schemaName.$type")) {
+                $type = $this->typeRegistry->get("$schemaName.$type");
             } else {
                 $reflection = $this->resourceLoader->getResourceByClassName($schemaName, $type)['reflection'] ?? null;
                 $classPath = $reflection?->getName() ?? $type;
