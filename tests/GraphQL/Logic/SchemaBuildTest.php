@@ -11,9 +11,7 @@ class SchemaBuildTest extends KernelTestCase
 
     public function setUp(): void
     {
-        $kernel = self::bootKernel();
-        $container = $kernel->getContainer();
-        $this->schemaBuilder = $container->get(SchemaBuilder::class);
+        $this->schemaBuilder = self::getContainer()->get('jav_apitopia.graphql.schema_builder');
     }
 
     public function testBuild(): void

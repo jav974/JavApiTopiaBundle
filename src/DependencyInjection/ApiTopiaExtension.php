@@ -8,10 +8,6 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\MutationResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\SubscriptionResolverInterface;
-use Jav\ApiTopiaBundle\Cache\ResourcesWarmer;
-use Jav\ApiTopiaBundle\Controller\GraphiQLController;
-use Jav\ApiTopiaBundle\GraphQL\SchemaBuilder;
-use Jav\ApiTopiaBundle\Loader\RouteLoader;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
@@ -40,12 +36,12 @@ class ApiTopiaExtension extends ConfigurableExtension
         $loader->load('services.yaml');
 
         $container
-            ->getDefinition(SchemaBuilder::class)
+            ->getDefinition('jav_apitopia.graphql.schema_builder')
             ->addMethodCall('setConfig', [$mergedConfig['schemas'] ?? []])
             ->addMethodCall('setSchemaOutputDirectory', [$mergedConfig['schema_output_dir']]);
 
         $container
-            ->getDefinition(ResourcesWarmer::class)
+            ->getDefinition('jav_apitopia.cache.resources_warmer')
             ->addMethodCall('setConfig', [$mergedConfig['schemas'] ?? []]);
 
         $graphQLEndpoints = [];
@@ -55,11 +51,11 @@ class ApiTopiaExtension extends ConfigurableExtension
         }
 
         $container
-            ->getDefinition(RouteLoader::class)
+            ->getDefinition('jav_apitopia.loader.route')
             ->addMethodCall('setGraphQLEndpoints', [$graphQLEndpoints]);
 
         $container
-            ->getDefinition(GraphiQLController::class)
+            ->getDefinition('jav_apitopia.controller.graphiql')
             ->setArgument('$endpoints', $graphQLEndpoints);
     }
 }

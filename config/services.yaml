@@ -4,45 +4,69 @@ services:
         autoconfigure: false
         public: false
 
-    Jav\ApiTopiaBundle\Loader\RouteLoader:
+    jav_apitopia.loader.route:
+        class: Jav\ApiTopiaBundle\Loader\RouteLoader
         tags: [ routing.loader ]
 
-    Jav\ApiTopiaBundle\GraphQL\RequestHandler:
-        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\SchemaBuilder']
-        tags: [ controller.service_arguments ]
-
-    Jav\ApiTopiaBundle\Command\BuildSchemaCommand:
-        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\SchemaBuilder']
+    jav_apitopia.command.build_schema:
+        class: Jav\ApiTopiaBundle\Command\BuildSchemaCommand
+        arguments: [ '@jav_apitopia.graphql.schema_builder']
         tags: [ console.command ]
 
-    Jav\ApiTopiaBundle\Serializer\Serializer:
-        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader' ]
+    jav_apitopia.serializer.serializer:
+        class: Jav\ApiTopiaBundle\Serializer\Serializer
+        arguments: [ '@jav_apitopia.graphql.resource_loader' ]
 
-    Jav\ApiTopiaBundle\Serializer\UploadedFileDenormalizer:
+    jav_apitopia.serializer.uploaded_file_denormalizer:
+        class: Jav\ApiTopiaBundle\Serializer\UploadedFileDenormalizer
         tags: [ serializer.normalizer ]
 
-    Jav\ApiTopiaBundle\Controller\:
-        resource: '../src/Controller/'
+    jav_apitopia.graphql.request_handler:
+        class: Jav\ApiTopiaBundle\GraphQL\RequestHandler
+        arguments: [ '@jav_apitopia.graphql.schema_builder' ]
+        tags: [ controller.service_arguments ]
         autowire: true
         autoconfigure: true
-        tags: [ 'controller.service_arguments' ]
 
-    Jav\ApiTopiaBundle\GraphQL\SchemaBuilder:
-        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader', '@Jav\ApiTopiaBundle\GraphQL\TypeResolver', '@Jav\ApiTopiaBundle\GraphQL\ResolverProvider' ]
+    jav_apitopia.controller.graphiql:
+        class: Jav\ApiTopiaBundle\Controller\GraphiQLController
+        tags: [ 'controller.service_arguments' ]
+        autowire: true
+        autoconfigure: true
+
+    jav_apitopia.graphql.schema_builder:
+        class: Jav\ApiTopiaBundle\GraphQL\SchemaBuilder
+        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.graphql.type_resolver', '@jav_apitopia.graphql.resolver_provider' ]
         public: true
 
-    Jav\ApiTopiaBundle\GraphQL\ResourceLoader:
+    jav_apitopia.graphql.resource_loader:
+        class: Jav\ApiTopiaBundle\GraphQL\ResourceLoader
         arguments: [ '%kernel.cache_dir%' ]
-    Jav\ApiTopiaBundle\GraphQL\ReflectionUtils:
-        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader', '@Jav\ApiTopiaBundle\Serializer\Serializer' ]
-    Jav\ApiTopiaBundle\GraphQL\Client: ~
-    Jav\ApiTopiaBundle\GraphQL\ResolverProvider:
-        arguments: [ !tagged_locator { tag: 'apitopia.graphql_resolver' }, '@Jav\ApiTopiaBundle\Serializer\Serializer', '@Jav\ApiTopiaBundle\GraphQL\MercureUrlGenerator' ]
-    Jav\ApiTopiaBundle\GraphQL\TypeResolver:
-        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader', '@Jav\ApiTopiaBundle\GraphQL\ResolverProvider', '@Jav\ApiTopiaBundle\Serializer\Serializer', '@Jav\ApiTopiaBundle\GraphQL\ReflectionUtils' ]
-    Jav\ApiTopiaBundle\GraphQL\MercureUrlGenerator:
+
+    jav_apitopia.graphql.reflection_utils:
+        class: Jav\ApiTopiaBundle\GraphQL\ReflectionUtils
+        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.serializer.serializer' ]
+
+    jav_apitopia.graphql.client:
+        class: Jav\ApiTopiaBundle\GraphQL\Client
+        public: true
+    Jav\ApiTopiaBundle\GraphQL\Client:
+        alias: jav_apitopia.graphql.client
+
+    jav_apitopia.graphql.resolver_provider:
+        class: Jav\ApiTopiaBundle\GraphQL\ResolverProvider
+        arguments: [ !tagged_locator { tag: 'apitopia.graphql_resolver' }, '@jav_apitopia.serializer.serializer', '@jav_apitopia.graphql.mercure_url_generator' ]
+
+    jav_apitopia.graphql.type_resolver:
+        class: Jav\ApiTopiaBundle\GraphQL\TypeResolver
+        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.graphql.resolver_provider', '@jav_apitopia.serializer.serializer', '@jav_apitopia.graphql.reflection_utils' ]
+
+    jav_apitopia.graphql.mercure_url_generator:
+        class: Jav\ApiTopiaBundle\GraphQL\MercureUrlGenerator
         arguments: [ '@?Symfony\Component\Mercure\HubRegistry', '@?Symfony\Component\Mercure\Authorization', '@request_stack' ]
-    Jav\ApiTopiaBundle\Cache\ResourcesWarmer:
-        arguments: [ '@Jav\ApiTopiaBundle\GraphQL\ResourceLoader' ]
+
+    jav_apitopia.cache.resources_warmer:
+        class: Jav\ApiTopiaBundle\Cache\ResourcesWarmer
+        arguments: [ '@jav_apitopia.graphql.resource_loader' ]
         tags:
             - { name: kernel.cache_warmer }

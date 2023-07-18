@@ -40,19 +40,19 @@ class RouteLoader extends Loader
     {
         foreach ($this->graphQLEndpoints as $schemaName => $endpoint) {
             $routes->add('apitopia_graphql_' . $schemaName, new Route($endpoint, [
-                '_controller' => 'Jav\ApiTopiaBundle\GraphQL\RequestHandler::handleRequest',
+                '_controller' => 'jav_apitopia.graphql.request_handler::handleRequest',
                 '_apitopia' => [
                     'schema' => $schemaName,
                     'endpoint' => $endpoint
                 ]
-            ], methods: ['POST']));
+            ], methods: ['POST', 'GET']));
         }
     }
 
     private function loadGraphiQLEndpoint(RouteCollection $routes): void
     {
         $routes->add('apitopia_graphiql', new Route('/api/graphiql/{schema}', [
-            '_controller' => 'Jav\ApiTopiaBundle\Controller\GraphiQLController::index',
+            '_controller' => 'jav_apitopia.controller.graphiql::index',
         ], methods: ['GET', 'POST']));
     }
 
