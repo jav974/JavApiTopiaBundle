@@ -14,7 +14,6 @@ abstract class AbstractApiTestCase extends WebTestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
         $this->setUpClient();
     }
 
@@ -34,9 +33,7 @@ abstract class AbstractApiTestCase extends WebTestCase
      */
     protected function graphQL(string $uri, string $gql, array $variables = [], array $files = []): array
     {
-        $response = $this->client->request($uri, $gql, $variables, $files);
-
-        return json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        return $this->client->request($uri, $gql, $variables, $files);
     }
 
     /**

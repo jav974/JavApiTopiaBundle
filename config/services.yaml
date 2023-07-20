@@ -36,7 +36,7 @@ services:
 
     jav_apitopia.graphql.schema_builder:
         class: Jav\ApiTopiaBundle\GraphQL\SchemaBuilder
-        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.graphql.type_resolver', '@jav_apitopia.graphql.resolver_provider' ]
+        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.graphql.type_resolver', '@jav_apitopia.graphql.resolver_provider', '@jav_apitopia.graphql.fields_builder', '@jav_apitopia.graphql.type_registry' ]
         public: true
 
     jav_apitopia.graphql.resource_loader:
@@ -59,7 +59,7 @@ services:
 
     jav_apitopia.graphql.type_resolver:
         class: Jav\ApiTopiaBundle\GraphQL\TypeResolver
-        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.graphql.resolver_provider', '@jav_apitopia.serializer.serializer', '@jav_apitopia.graphql.reflection_utils', '@jav_apitopia.graphql.type_registry' ]
+        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.graphql.resolver_provider', '@jav_apitopia.serializer.serializer', '@jav_apitopia.graphql.reflection_utils', '@jav_apitopia.graphql.type_registry', '@jav_apitopia.graphql.fields_builder' ]
 
     jav_apitopia.graphql.mercure_url_generator:
         class: Jav\ApiTopiaBundle\GraphQL\MercureUrlGenerator
@@ -73,3 +73,7 @@ services:
 
     jav_apitopia.graphql.type_registry:
         class: Jav\ApiTopiaBundle\GraphQL\TypeRegistry
+
+    jav_apitopia.graphql.fields_builder:
+        class: Jav\ApiTopiaBundle\GraphQL\FieldsBuilder
+        arguments: [ '@jav_apitopia.graphql.type_registry', '@jav_apitopia.graphql.resolver_provider' ]

@@ -9,14 +9,12 @@ use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type;
-use GraphQL\Type\Definition\WrappingType;
 use GraphQLRelay\Relay;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
 use Jav\ApiTopiaBundle\Serializer\Serializer;
 use ReflectionClass;
 use RuntimeException;
-use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class TypeResolver
@@ -30,6 +28,7 @@ class TypeResolver
         private readonly Serializer $serializer,
         private readonly ReflectionUtils $reflectionUtils,
         private readonly TypeRegistry $typeRegistry,
+        private readonly FieldsBuilder $fieldsBuilder,
         private readonly ?NodeResolverInterface $nodeResolver = null
     ) {
         $this->nodeDefinition = Relay::nodeDefinitions(
@@ -43,6 +42,7 @@ class TypeResolver
             }
         );
         $this->typeRegistry->register('Node', $this->nodeDefinition['nodeInterface']);
+        $this->fieldsBuilder->setTypeResolver($this);
     }
 
     /**
@@ -108,44 +108,6 @@ class TypeResolver
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    public function getObjectTypeField(string $schemaName, string $classPath, ?string $comment, bool $allowsNull, ?Attribute $attribute, bool $isCollection): array
-    {
-        $field = [];
-        $outputClassName = ReflectionUtils::getClassNameFromClassPath($classPath);
-        $type = $this->resolveTypeFromSchema($classPath, $schemaName);
-        $type = $this->resolve($schemaName, $type, $isCollection);
-
-        if (!$allowsNull) {
-            $type = Type::nonNull($type);
-        }
-
-        if ($attribute) {
-            $field['args'] = $this->resolveAttributeArgs($schemaName, $attribute);
-            $field['resolve'] = $this->resolverProvider->getResolveCallback($schemaName, $attribute);
-        }
-
-        if ($attribute instanceof QueryCollection && $attribute->paginationEnabled) {
-            if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
-                $type = $this->getRelayConnection($schemaName, $outputClassName, $type);
-                $field['args'] += Relay::connectionArgs();
-            } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
-                $type = $this->getOffsetConnection($schemaName, $outputClassName, $type);
-                $field['args'] += $this->getOffsetConnectionArgs();
-            }
-        }
-
-        $field['type'] = $type;
-
-        if ($comment) {
-            $field['description'] = $comment;
-        }
-
-        return $field;
-    }
-
-    /**
      * @param ReflectionClass<object> $reflectionClass
      */
     private function createObjectType(string $schemaName, ReflectionClass $reflectionClass): ObjectType
@@ -175,7 +137,7 @@ class TypeResolver
                         $propertyName = '_id';
                     }
 
-                    $fields[$propertyName] = $this->getObjectTypeField(
+                    $fields[$propertyName] = $this->fieldsBuilder->getObjectTypeField(
                         $schemaName,
                         $fieldInfo['type'],
                         $fieldInfo['description'],
@@ -216,87 +178,6 @@ class TypeResolver
         return $type;
     }
 
-    private function getOffsetConnection(string $schemaName, string $outputClassName, Type $type): ObjectType
-    {
-        if ($type instanceof WrappingType) {
-            $type = $type->getInnerMostType();
-        }
-
-        $connectionName = $outputClassName . 'OffsetConnection';
-
-        if (!$this->typeRegistry->has("$schemaName.$connectionName")) {
-            $this->typeRegistry->register("$schemaName.$connectionName", new ObjectType([
-                'name' => $connectionName,
-                'fields' => [
-                    'items' => [
-                        'type' => Type::listOf($type),
-                        'description' => 'The list of items in the connection.',
-                    ],
-                    'totalCount' => [
-                        'type' => Type::nonNull(Type::int()),
-                        'description' => 'The total count of items in the connection.',
-                        'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
-                    ],
-                ],
-            ]));
-        }
-
-        // @phpstan-ignore-next-line
-        return $this->typeRegistry->get("$schemaName.$connectionName");
-    }
-
-    /**
-     * @return array<string, array<string, mixed>>
-     */
-    private function getOffsetConnectionArgs(): array
-    {
-        return [
-            'limit' => [
-                'type' => Type::int()
-            ],
-            'offset' => [
-                'type' => Type::int()
-            ]
-        ];
-    }
-
-    private function getRelayConnection(string $schemaName, string $outputClassName, Type $type): ObjectType
-    {
-        if ($type instanceof WrappingType) {
-            $type = $type->getInnerMostType();
-        }
-
-        $edgeName = $outputClassName . 'Edge';
-        $connectionName = $outputClassName . 'CursorConnection';
-
-        if (!$this->typeRegistry->has("$schemaName.$edgeName")) {
-            $this->typeRegistry->register("$schemaName.$edgeName", Relay::edgeType([
-                'nodeType' => $type,
-                'name' => $outputClassName,
-            ]));
-        }
-
-        $edge = $this->typeRegistry->get("$schemaName.$edgeName");
-
-        if (!$this->typeRegistry->has("$schemaName.$connectionName")) {
-            $this->typeRegistry->register("$schemaName.$connectionName", Relay::connectionType([
-                'nodeType' => $type,
-                'edgeType' => $edge,
-                'connectionFields' => [
-                    'totalCount' => [
-                        'type' => Type::nonNull(Type::int()),
-                        'description' => 'The total count of items in the connection.',
-                        'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
-                    ],
-                ],
-                'name' => $outputClassName . 'Cursor'
-            ]));
-        }
-
-        // @phpstan-ignore-next-line
-        return $this->typeRegistry->get("$schemaName.$connectionName");
-    }
-
     /**
      * @param ReflectionClass<object> $reflectionClass
      */
@@ -326,11 +207,6 @@ class TypeResolver
         $this->typeRegistry->register($schemaName . '.' . $reflectionClass->getShortName(), $type);
 
         return $type;
-    }
-
-    public function setType(string $schemaName, string $name, Type&NullableType $type): void
-    {
-        $this->typeRegistry->register("$schemaName.$name", $type);
     }
 
     /**
@@ -374,7 +250,7 @@ class TypeResolver
         return $args;
     }
 
-    private function resolveTypeFromSchema(string $type, string $schemaName): string
+    public function resolveTypeFromSchema(string $type, string $schemaName): string
     {
         return $this->resourceLoader->getReflectionClass($schemaName, $type)?->getName() ?? $type;
     }

@@ -3,6 +3,7 @@
 namespace Jav\ApiTopiaBundle\GraphQL;
 
 use InvalidArgumentException;
+use JsonException;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\HttpClient\CurlHttpClient;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -31,18 +32,22 @@ class Client
     /**
      * @param array<string, mixed> $variables
      * @param array<UploadedFile> $files
+     * @throws JsonException
+     * @return array{data?: array<string, mixed>, errors?: array<array<string, mixed>>} The decoded query result
      */
-    public function request(string $endpoint, string $gql, array $variables = [], array $files = [], ?string $contentType = null): ResponseInterface|Response
+    public function request(string $endpoint, string $gql, array $variables = [], array $files = [], ?string $contentType = null): array
     {
         if ($contentType === self::CONTENT_TYPE_FORM_DATA || !empty($files)) {
-            return $this->requestFormData($endpoint, $gql, $variables, $files);
+            $response = $this->requestFormData($endpoint, $gql, $variables, $files);
         } elseif ($contentType === self::CONTENT_TYPE_GRAPHQL) {
-            return $this->requestGraphQL($endpoint, $gql, $variables);
+            $response = $this->requestGraphQL($endpoint, $gql, $variables);
         } elseif ($contentType === self::CONTENT_TYPE_JSON || $contentType === null) {
-            return $this->requestJson($endpoint, $gql, $variables);
+            $response = $this->requestJson($endpoint, $gql, $variables);
         } else {
             throw new InvalidArgumentException(sprintf('Invalid content type: %s', $contentType));
         }
+
+        return json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
     }
 
     /**

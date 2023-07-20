@@ -33,7 +33,9 @@ class SchemaBuilder
     public function __construct(
         private readonly ResourceLoader $resourceLoader,
         private readonly TypeResolver $typeResolver,
-        private readonly ResolverProvider $resolverProvider
+        private readonly ResolverProvider $resolverProvider,
+        private readonly FieldsBuilder $fieldsBuilder,
+        private readonly TypeRegistry $typeRegistry,
     ) {
     }
 
@@ -127,7 +129,7 @@ class SchemaBuilder
 
                 $outputType = $query->output ?? $classPath;
 
-                $fields[$operationName] = $this->typeResolver->getObjectTypeField(
+                $fields[$operationName] = $this->fieldsBuilder->getObjectTypeField(
                     $schemaName,
                     $outputType,
                     $query->description,
@@ -185,8 +187,8 @@ class SchemaBuilder
                     throw new InvalidArgumentException("No name found for input type");
                 }
 
-                $this->typeResolver->setType($schemaName, $inputType->name, $inputType);
-                $this->typeResolver->setType($schemaName, $mutationData['type']->name, $mutationData['type']);
+                $this->typeRegistry->register("$schemaName.$inputType->name", $inputType);
+                $this->typeRegistry->register("$schemaName.{$mutationData['type']->name}", $mutationData['type']);
 
                 $fields[$operationName] = $mutationData;
             }
@@ -239,7 +241,7 @@ class SchemaBuilder
                     ]
                 ]);
 
-                $this->typeResolver->setType($schemaName, $payloadType->name, $payloadType);
+                $this->typeRegistry->register("$schemaName.$payloadType->name", $payloadType);
 
                 $inputType = new InputObjectType([
                     'name' => $subscription->name . 'Input',
@@ -253,7 +255,7 @@ class SchemaBuilder
                     ] + $this->typeResolver->resolveAttributeArgs($schemaName, $subscription, true)
                 ]);
 
-                $this->typeResolver->setType($schemaName, $inputType->name, $inputType);
+                $this->typeRegistry->register("$schemaName.$inputType->name", $inputType);
 
                 $args = [
                     'input' => [
