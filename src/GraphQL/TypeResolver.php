@@ -8,6 +8,7 @@ use DateTimeInterface;
 use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\ObjectType;
+use GraphQL\Type\Definition\PhpEnumType;
 use GraphQL\Type\Definition\Type;
 use GraphQLRelay\Relay;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
@@ -101,7 +102,11 @@ class TypeResolver
         $reflectionClass = $this->resourceLoader->getReflectionClass($schemaName, $classPath);
 
         if (!$reflectionClass) {
-            throw new RuntimeException(sprintf('Class "%s" not found in schema "%s".', $classPath, $schemaName));
+            throw new RuntimeException(sprintf('Class/Enum "%s" not found in schema "%s".', $classPath, $schemaName));
+        }
+
+        if ($reflectionClass->isEnum()) {
+            return $this->createEnumType($schemaName, $reflectionClass);
         }
 
         return $input ? $this->createInputType($schemaName, $reflectionClass) : $this->createObjectType($schemaName, $reflectionClass);
@@ -149,7 +154,11 @@ class TypeResolver
                     if ($propertyName === '_id' && $isNodeInterface) {
                         $fields[$propertyName]['resolve'] = fn ($object) => is_object($object) ? $object->id : (is_array($object) ? $object['id'] : null);
                     } elseif (!$fieldInfo['attribute']) {
-                        $fields[$propertyName]['resolve'] = function ($object) use ($propertyName, $propertyMetadata) {
+                        $fields[$propertyName]['resolve'] = function ($object) use ($propertyName, $propertyMetadata, $fieldInfo) {
+                            if ($fieldInfo['isEnum']) {
+                                return $object->{$propertyName};
+                            }
+
                             if (is_object($object) && isset($object->{$propertyName})) {
                                 return $this->serializer->normalize(
                                     $object->{$propertyName},
@@ -205,6 +214,15 @@ class TypeResolver
         ]);
 
         $this->typeRegistry->register($schemaName . '.' . $reflectionClass->getShortName(), $type);
+
+        return $type;
+    }
+
+    private function createEnumType(string $schemaName, \ReflectionClass|\ReflectionEnum $reflectionEnum): Type&NullableType
+    {
+        $type = new PhpEnumType($reflectionEnum->getName());
+
+        $this->typeRegistry->register($schemaName . '.' . $reflectionEnum->getShortName(), $type);
 
         return $type;
     }

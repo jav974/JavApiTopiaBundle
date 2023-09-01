@@ -16,6 +16,7 @@ class Schema1DeferredQueryTest extends AbstractApiTestCase
                         street
                         city
                         country
+                        type
                     }
                 }
             }
@@ -29,7 +30,8 @@ class Schema1DeferredQueryTest extends AbstractApiTestCase
                         'billingAddress' => [
                             'street' => 'Street 1',
                             'city' => 'City 1',
-                            'country' => 'Country 1'
+                            'country' => 'Country 1',
+                            'type' => 'WORK'
                         ]
                     ],
                     [
@@ -37,7 +39,8 @@ class Schema1DeferredQueryTest extends AbstractApiTestCase
                         'billingAddress' => [
                             'street' => 'Street 2',
                             'city' => 'City 2',
-                            'country' => 'Country 2'
+                            'country' => 'Country 2',
+                            'type' => 'HOME'
                         ]
                     ]
                 ]

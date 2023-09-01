@@ -57,4 +57,30 @@ class Schema1QueryTest extends AbstractApiTestCase
             ]
         ]);
     }
+
+    public function testCustomFavoriteProducts(): void
+    {
+        $response = $this->graphQL('/test/graphql/test1', /** @lang GraphQL */'
+            query {
+                customFavoriteProducts(sort: DESC) {
+                    _id
+                    name
+                    picture
+                }
+            }
+        ');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertGraph($response, [
+            'data' => [
+                'customFavoriteProducts' => [
+                    0 => [
+                        '_id' => 1,
+                        'name' => 'Product 1',
+                        'picture' => null
+                    ]
+                ]
+            ]
+        ]);
+    }
 }

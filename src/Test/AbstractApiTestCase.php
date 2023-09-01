@@ -42,6 +42,10 @@ abstract class AbstractApiTestCase extends WebTestCase
      */
     protected function assertGraph(array $actual, array $expected, string $path = ''): void
     {
+        if (isset($actual['errors']) && !isset($expected['errors'])) {
+            $this->fail(sprintf('GraphQL error: %s', json_encode($actual['errors'])));
+        }
+
         foreach ($expected as $key => $value) {
             $this->assertArrayHasKey($key, $actual, "GraphQL path $path");
 

@@ -6,7 +6,10 @@ use Doctrine\Common\Annotations\AnnotationReader;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 use ReflectionClass;
+use ReflectionEnum;
+use ReflectionException;
 use Symfony\Component\Finder\Finder;
+use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactory;
 use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactoryInterface;
 use Symfony\Component\Serializer\Mapping\Loader\AnnotationLoader;
@@ -56,26 +59,34 @@ class ResourceLoader
             $finder = (new Finder())->files()->in($resourceDirectory)->name('*.php');
 
             foreach ($finder as $file) {
-                preg_match('/namespace\s+(.+);/', $file->getContents(), $matches);
-                $namespace = $matches[1] ?? '';
+                $info = $this->getInfoFromFile($file);
+                $namespace = $info['namespace'];
                 $className = $file->getBasename('.php');
                 $classPath = $namespace . '\\' . $className;
 
                 try {
-                    $metadata = self::$classMetadataFactory->getMetadataFor($classPath);
-                    $reflectionClass = $metadata->getReflectionClass();
-                    /** @var ApiResource|null $apiResource */
-                    $apiResource = ($reflectionClass->getAttributes(ApiResource::class)[0] ?? null)?->newInstance();
-                    $queries = array_filter($apiResource?->queries ?? [], fn($query) => !$query instanceof QueryCollection);
-                    $queryCollections = array_filter($apiResource?->queries ?? [], fn($query) => $query instanceof QueryCollection);
+                    if ($info['isClass']) {
+                        $metadata = self::$classMetadataFactory->getMetadataFor($classPath);
+                        $reflectionClass = $metadata->getReflectionClass();
+                        /** @var ApiResource|null $apiResource */
+                        $apiResource = ($reflectionClass->getAttributes(ApiResource::class)[0] ?? null)?->newInstance();
+                        $queries = array_filter($apiResource?->queries ?? [], fn($query) => !$query instanceof QueryCollection);
+                        $queryCollections = array_filter($apiResource?->queries ?? [], fn($query) => $query instanceof QueryCollection);
 
-                    self::$resources[$schemaName][$classPath] = [
-                        'name' => $className,
-                        'queries' => $queries,
-                        'query_collections' => $queryCollections,
-                        'mutations' => $apiResource?->mutations ?? [],
-                        'subscriptions' => $apiResource?->subscriptions ?? [],
-                    ];
+                        self::$resources[$schemaName][$classPath] = [
+                            'type' => 'class',
+                            'name' => $className,
+                            'queries' => $queries,
+                            'query_collections' => $queryCollections,
+                            'mutations' => $apiResource?->mutations ?? [],
+                            'subscriptions' => $apiResource?->subscriptions ?? [],
+                        ];
+                    } elseif ($info['isEnum']) {
+                        self::$resources[$schemaName][$classPath] = [
+                            'type' => 'enum',
+                            'name' => $className,
+                        ];
+                    }
                 } catch (Throwable) {
                     // We might have a file that is not a resource, not even a class, so we just ignore it
                 }
@@ -86,19 +97,49 @@ class ResourceLoader
     }
 
     /**
-     * @return array<string, array<string, mixed>>
+     * @return array<string, mixed>
      */
-    public function getResources(string $schemaName): array
+    private function getInfoFromFile(SplFileInfo $file): array
     {
-        return self::$resources[$schemaName] ?? [];
+        $content = $file->getContents();
+
+        preg_match('/namespace\s+(.+);/', $content, $namespaceMatches);
+        $isClass = preg_match('/class\s+(.+)\s+/', $content, $classMatches) > 0;
+        $isTrait = preg_match('/trait\s+(.+)\s+/', $content, $traitMatches) > 0;
+        $isEnum = preg_match('/enum\s+(.+)\s+/', $content, $enumMatches) > 0;
+
+        return [
+            'namespace' => $namespaceMatches[1] ?? '',
+            'isClass' => $isClass,
+            'className' => $classMatches[1] ?? '',
+            'isTrait' => $isTrait,
+            'traitName' => $traitMatches[1] ?? '',
+            'isEnum' => $isEnum,
+            'enumName' => $enumMatches[1] ?? '',
+        ];
     }
 
     /**
-     * @return ReflectionClass<object>|null
+     * @return array<string, array<string, mixed>>
      */
-    public function getReflectionClass(string $schemaName, string $classPath): ?ReflectionClass
+    public function getResources(string $schemaName, string $type = 'class'): array
+    {
+        $collection = self::$resources[$schemaName] ?? [];
+
+        return array_filter($collection, fn ($resource) => $resource['type'] === $type);
+    }
+
+    /**
+     * @return ReflectionClass<object>|ReflectionEnum<object>|null
+     * @throws ReflectionException
+     */
+    public function getReflectionClass(string $schemaName, string $classPath): ReflectionClass|ReflectionEnum|null
     {
         if (isset(self::$resources[$schemaName][$classPath])) {
+            if (self::$resources[$schemaName][$classPath]['type'] === 'enum') {
+                return self::$resources[$schemaName][$classPath]['reflection'] ??= new ReflectionEnum($classPath);
+            }
+
             return self::$resources[$schemaName][$classPath]['reflection'] ??= self::$classMetadataFactory
                 ->getMetadataFor($classPath)
                 ->getReflectionClass();

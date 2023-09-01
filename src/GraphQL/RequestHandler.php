@@ -52,7 +52,10 @@ class RequestHandler
 
             return new JsonResponse($jsonResult, $statusCode, [], true);
         } catch (\Throwable $e) {
-            return new JsonResponse(['errors' => [FormattedError::createFromException($e)]], 500);
+            return new JsonResponse([
+                'errors' => [
+                    FormattedError::createFromException($e, DebugFlag::INCLUDE_DEBUG_MESSAGE|DebugFlag::INCLUDE_TRACE)
+                ]], 500);
         }
     }
 

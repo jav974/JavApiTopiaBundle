@@ -4,6 +4,7 @@ namespace Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver;
 
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\DTO\Address;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\DTO\Enums\AddressType;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\DTO\User;
 
 class UserResolver implements QueryItemResolverInterface
@@ -19,6 +20,7 @@ class UserResolver implements QueryItemResolverInterface
         $user->address->street = 'Street 1';
         $user->address->city = 'City 1';
         $user->address->country = 'Country 1';
+        $user->address->type = AddressType::HOME;
 
         $user->otherAddreses = [
             new Address(),
@@ -28,6 +30,7 @@ class UserResolver implements QueryItemResolverInterface
         $user->otherAddreses[0]->street = 'Street 2';
         $user->otherAddreses[0]->city = 'City 2';
         $user->otherAddreses[0]->country = 'Country 2';
+        $user->otherAddreses[0]->type = AddressType::WORK;
 
         $user->otherAddreses[1]->street = 'Street 3';
         $user->otherAddreses[1]->city = 'City 3';

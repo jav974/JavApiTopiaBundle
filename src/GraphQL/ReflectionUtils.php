@@ -59,6 +59,7 @@ class ReflectionUtils
                 'isBuiltin' => $isBuiltin,
                 'attribute' => $attribute?->newInstance(),
                 'metadata' => $metadata[$name] ?? null,
+                'isEnum' => enum_exists($innerType?->getClassName() ?? ''),
             ];
         }
 
