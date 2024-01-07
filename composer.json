@@ -44,7 +44,7 @@
     "phpcompatibility/php-compatibility": "^9.3",
     "nyholm/symfony-bundle-test": "^2.0",
     "matthiasnoback/symfony-dependency-injection-test": "^5.0",
-    "symfony/phpunit-bridge": "^6.2",
+    "symfony/phpunit-bridge": "^7.0",
     "symfony/browser-kit": "^6.2"
   },
   "autoload": {
