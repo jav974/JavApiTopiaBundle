@@ -12,7 +12,6 @@ use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactory;
 use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactoryInterface;
-use Symfony\Component\Serializer\Mapping\Loader\AnnotationLoader;
 use Throwable;
 
 class ResourceLoader
@@ -23,7 +22,11 @@ class ResourceLoader
 
     public function __construct(private readonly string $cacheDir)
     {
-        self::$classMetadataFactory = new ClassMetadataFactory(new AnnotationLoader(new AnnotationReader()));
+        if (class_exists('Symfony\Component\Serializer\Mapping\Loader\AttributeLoader')) {
+            self::$classMetadataFactory = new ClassMetadataFactory(new \Symfony\Component\Serializer\Mapping\Loader\AttributeLoader(new AnnotationReader()));
+        } else {
+            self::$classMetadataFactory = new ClassMetadataFactory(new \Symfony\Component\Serializer\Mapping\Loader\AnnotationLoader(new AnnotationReader()));
+        }
     }
 
     public function getClassMetatadaFactory(): ClassMetadataFactoryInterface
