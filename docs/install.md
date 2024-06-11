@@ -57,10 +57,25 @@ return [
 Import apitopia routing configuration by adding these lines:
 
 ```yaml
-#config/routes.yaml
+#config/routes/apitopia.yaml
 
 apitopia:
   resource: .
   type: apitopia
 ```
 This will import the routes defined in GraphQL endpoints configuration and graphiql endpoint.
+
+Add the following config template:
+
+```yaml
+#config/packages/apitopia.yaml
+
+api_topia:
+  schema_output_dir: '%kernel.project_dir%'
+  schemas:
+    default_schema:
+      path: '/graphql'
+      resource_directories: ['%kernel.project_dir%/src/Api']
+```
+*Make sure that **resource_directories** exist*
+
