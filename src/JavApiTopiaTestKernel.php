@@ -43,15 +43,27 @@ class JavApiTopiaTestKernel extends BaseKernel
         $loader->load(function (ContainerBuilder $container) {
             $container->setParameter('kernel.secret', 'apitopia_test');
 
-            $container->loadFromExtension('framework', [
+            $frameworkConfig = [
                 'test' => true,
                 'http_method_override' => false,
+                'php_errors' => [
+                    'log' => true
+                ],
+                'annotations' => [
+                    'enabled' => BaseKernel::VERSION_ID < 60400
+                ],
                 'router' => [
                     'utf8' => true,
                     'type' => 'apitopia',
                     'resource' => '.'
                 ]
-            ]);
+            ];
+
+            if (BaseKernel::VERSION_ID >= 60400) {
+                $frameworkConfig['handle_all_throwables'] = true;
+            }
+
+            $container->loadFromExtension('framework', $frameworkConfig);
 
             $container->loadFromExtension('mercure', [
                 'hubs' => [
