@@ -10,6 +10,7 @@ use ReflectionEnum;
 use ReflectionException;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
+use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactory;
 use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactoryInterface;
 use Throwable;
@@ -23,9 +24,11 @@ class ResourceLoader
     public function __construct(private readonly string $cacheDir)
     {
         if (class_exists('Symfony\Component\Serializer\Mapping\Loader\AttributeLoader')) {
-            self::$classMetadataFactory = new ClassMetadataFactory(new \Symfony\Component\Serializer\Mapping\Loader\AttributeLoader(new AnnotationReader()));
+            self::$classMetadataFactory = new ClassMetadataFactory(new \Symfony\Component\Serializer\Mapping\Loader\AttributeLoader());
         } else {
-            self::$classMetadataFactory = new ClassMetadataFactory(new \Symfony\Component\Serializer\Mapping\Loader\AnnotationLoader(new AnnotationReader()));
+            self::$classMetadataFactory = new ClassMetadataFactory(new \Symfony\Component\Serializer\Mapping\Loader\AnnotationLoader(
+                Kernel::VERSION_ID < 60400 ? new AnnotationReader() : null
+            ));
         }
     }
 
