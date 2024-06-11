@@ -6,7 +6,7 @@ use Jav\ApiTopiaBundle\GraphQL\ResourceLoader;
 use Symfony\Component\HttpKernel\CacheWarmer\CacheWarmerInterface;
 use Symfony\Component\HttpKernel\Kernel;
 
-if (Kernel::VERSION_ID < 7000) {
+if (Kernel::MAJOR_VERSION < 7) {
     class ResourcesWarmer implements CacheWarmerInterface
     {
         /** @var array<string, mixed> */
