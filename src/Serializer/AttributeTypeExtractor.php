@@ -18,6 +18,14 @@ class AttributeTypeExtractor implements PropertyTypeExtractorInterface, Property
 
     /**
      * @param array<mixed> $context
+     */
+    public function getType(string $class, string $property, array $context = []): ?Type
+    {
+        return $this->getTypes($class, $property, $context)[0] ?? null;
+    }
+
+    /**
+     * @param array<mixed> $context
      * @return Type[]|null
      */
     public function getTypes(string $class, string $property, array $context = []): ?array
