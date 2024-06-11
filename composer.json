@@ -27,7 +27,7 @@
     "symfony/config": ">=5.4",
     "symfony/serializer": ">=5.4",
     "symfony/property-access": ">=5.4",
-    "symfony/psr-http-message-bridge": "^2.2",
+    "symfony/psr-http-message-bridge": ">=2.2",
     "symfony/console": ">=5.4",
     "symfony/finder": ">=5.4",
     "symfony/http-client": ">=5.4",
