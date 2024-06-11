@@ -50,7 +50,7 @@ class JavApiTopiaTestKernel extends BaseKernel
                     'log' => true
                 ],
                 'annotations' => [
-                    'enabled' => BaseKernel::MAJOR_VERSION < 7
+                    'enabled' => BaseKernel::VERSION_ID < 60400
                 ],
                 'router' => [
                     'utf8' => true,
@@ -59,7 +59,7 @@ class JavApiTopiaTestKernel extends BaseKernel
                 ]
             ];
 
-            if (BaseKernel::MAJOR_VERSION >= 7) {
+            if (BaseKernel::VERSION_ID >= 60400) {
                 $frameworkConfig['handle_all_throwables'] = true;
             }
 
