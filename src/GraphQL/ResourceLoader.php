@@ -61,6 +61,8 @@ class ResourceLoader
             return ;
         }
 
+        self::$resources[$schemaName] = [];
+
         foreach ($resourceDirectories as $resourceDirectory) {
             $finder = (new Finder())->files()->in($resourceDirectory)->name('*.php');
 
