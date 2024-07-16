@@ -45,7 +45,7 @@
     "nyholm/symfony-bundle-test": "^3.0",
     "matthiasnoback/symfony-dependency-injection-test": "^5.0",
     "symfony/phpunit-bridge": "^7.0",
-    "symfony/browser-kit": "^6.2"
+    "symfony/browser-kit": "^6.2|^7.1"
   },
   "autoload": {
     "psr-4": {
