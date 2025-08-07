@@ -29,7 +29,7 @@ Key differences are:
 - Paginated collection resolvers are called with 'limit' and 'offset' arguments computed, even with cursor based pagination type
 - Deferred subquery and subquery collection
 - No ORM/DataSource integration, you have to provide your own data from the resolvers (but you can use anything you want inside them since they are services)
-- No support for REST (yet?), only GraphQL
+- No support for REST, only GraphQL
 
 ### Read more:
 - [Install and configure apitopia](docs/install.md)
