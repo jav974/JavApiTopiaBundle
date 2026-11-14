@@ -136,29 +136,16 @@ class TypeResolver
         $this->nodeQueryLocator = $locator;
     }
 
+    /**
+     * The item query refetching nodes of a type, found through the schema index (see SchemaBuilder).
+     */
     private function getNodeQuery(string $schemaName, string $typeName): ?Query
     {
-        if ($this->nodeQueryLocator !== null) {
-            return $this->nodeQueries[$schemaName][$typeName] ??= ($this->nodeQueryLocator)($schemaName, $typeName);
+        if ($this->nodeQueryLocator === null) {
+            return null;
         }
 
-        if (!array_key_exists($typeName, $this->nodeQueries[$schemaName] ?? [])) {
-            $this->nodeQueries[$schemaName][$typeName] = null;
-
-            foreach ($this->resourceLoader->getResources($schemaName) as $classPath => $resource) {
-                /** @var Query $query */
-                foreach ($resource['queries'] as $query) {
-                    $output = ReflectionUtils::getClassNameFromClassPath($query->output ?? $classPath);
-
-                    if ($output === $typeName && isset($query->args['id'])) {
-                        $this->nodeQueries[$schemaName][$typeName] = $query;
-                        break 2;
-                    }
-                }
-            }
-        }
-
-        return $this->nodeQueries[$schemaName][$typeName];
+        return $this->nodeQueries[$schemaName][$typeName] ??= ($this->nodeQueryLocator)($schemaName, $typeName);
     }
 
     /**
