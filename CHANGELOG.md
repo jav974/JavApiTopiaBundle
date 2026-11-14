@@ -9,6 +9,7 @@
 - `ivome/graphql-relay-php` is now required as a stable version (`^0.7`); the `@dev` requirement is no longer needed.
 - `ecodev/graphql-upload` 8 is supported.
 - `symfony/mercure-bundle` is now optional (only required for subscriptions).
+- `phpdocumentor/reflection-docblock` 6 is supported (with Symfony >= 7.0).
 
 ### Relay
 
