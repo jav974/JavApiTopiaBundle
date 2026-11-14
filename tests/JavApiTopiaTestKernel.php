@@ -144,6 +144,7 @@ class JavApiTopiaTestKernel extends BaseKernel
             $container->loadFromExtension('twig', []);
 
             $container->register(FailingResolver::class)->addTag('apitopia.graphql_resolver');
+            $container->register(\Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObject2ByIdResolver::class)->addTag('apitopia.graphql_resolver');
             $container->register(DeferredCompanyResolver::class)->addTag('apitopia.graphql_resolver');
             $container->register(DeferredOrdersResolver::class)->addTag('apitopia.graphql_resolver');
             // Other environments use the automatic node refetch (item query of the type)

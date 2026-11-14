@@ -69,11 +69,6 @@ class TypeResolver
         return $type;
     }
 
-    public function getNodeInterface(): InterfaceType
-    {
-        return $this->nodeInterface;
-    }
-
     /**
      * The "node" and "nodes" root fields of a schema.
      *
@@ -151,19 +146,16 @@ class TypeResolver
         return $this->nodeQueries[$schemaName][$typeName];
     }
 
-    private function castNodeId(string $id, string $argType): int|float|string|null
+    /**
+     * Converts the raw identifier to the type of the "id" argument of the item query (ID and String stay strings).
+     */
+    private function castNodeId(string $id, string $argType): int|string|null
     {
-        $argType = rtrim($argType, '!');
-
-        if ($argType === 'Int') {
-            return preg_match('/^-?\d+$/', $id) === 1 ? (int) $id : null;
+        if (rtrim($argType, '!') !== 'Int') {
+            return $id;
         }
 
-        if ($argType === 'Float') {
-            return is_numeric($id) ? (float) $id : null;
-        }
-
-        return $id;
+        return preg_match('/^-?\d+$/', $id) === 1 ? (int) $id : null;
     }
 
     public function resolve(string $schemaName, string $classPath, bool $isCollection, bool $input = false): Type&NullableType

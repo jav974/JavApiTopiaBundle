@@ -45,7 +45,9 @@ class ResourceLoader
             return;
         }
 
-        $cache = new ConfigCache("$this->cacheDir/apitopia/resources.$schemaName.php", $this->debug);
+        // The directories are part of the key: changing them must not reuse a cache built from other directories
+        $key = $schemaName . '.' . substr(hash('xxh128', serialize($resourceDirectories)), 0, 16);
+        $cache = new ConfigCache("$this->cacheDir/apitopia/resources.$key.php", $this->debug);
 
         if ($invalidateCache || !$cache->isFresh()) {
             $classes = $this->discoverClasses($resourceDirectories);

@@ -20,6 +20,7 @@
 - **Offset paginated types are renamed from `<Type>OffsetConnection` to `<Type>OffsetPage`**, as names ending with `Connection` are reserved for Relay connections. Set `pagination.offset_type_suffix: OffsetConnection` to keep the old names.
 - `Jav\ApiTopiaBundle\GraphQL\Relay\Relay` provides `toGlobalId()`, `fromGlobalId()`, `offsetToCursor()` and `cursorToOffset()`. If your code uses `GraphQLRelay\…` classes directly, switch to it or require `ivome/graphql-relay-php` in your application.
 - Introspection of an unknown type (`__type(name: "Unknown")`) returns `null` instead of an error.
+- The resource cache is invalidated when the `resource_directories` of a schema change.
 
 ### Security
 

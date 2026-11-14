@@ -11,7 +11,7 @@ use Jav\ApiTopiaBundle\Test\AbstractApiTestCase;
  */
 class RelayComplianceTest extends AbstractApiTestCase
 {
-    protected static array $kernelOptions = ['environment' => 'test_legacy'];
+    protected static array $kernelOptions = ['environment' => 'test_legacy', 'debug' => true];
 
     public function testNodeRefetchesTheIdenticalObject(): void
     {
@@ -30,7 +30,8 @@ class RelayComplianceTest extends AbstractApiTestCase
             Relay::toGlobalId('test2.Unknown', '1'),
             Relay::toGlobalId('test1.ApiResourceObject', '1'), // another schema
             Relay::toGlobalId('test2.ApiResourceObject', 'abc'), // not an Int
-            Relay::toGlobalId('test2.ApiResourceObject2', '1'), // no item query
+            Relay::toGlobalId('test2.PureObject', '1'), // no item query
+            Relay::toGlobalId('test2.ApiResourceObject2', 'abc'), // the resolver returns null
         ];
 
         foreach ($ids as $id) {
@@ -73,5 +74,35 @@ class RelayComplianceTest extends AbstractApiTestCase
             'edges' => [['node' => ['_id' => 1]], ['node' => ['_id' => 2]]],
             'pageInfo' => ['hasPreviousPage' => false, 'hasNextPage' => true],
         ], $response['data']['apiResourceObject']['apiResourceSubObjectAsCursorBasedSubQueryCollection']);
+    }
+
+    public function testNodeRefetchWithStringIdentifier(): void
+    {
+        $id = Relay::toGlobalId('test2.ApiResourceObject2', '12');
+        $response = $this->graphQL('/test/graphql/test2', 'query ($id: ID!) { node(id: $id) { id ... on ApiResourceObject2 { _id } } }', ['id' => $id]);
+
+        $this->assertSame(['data' => ['node' => ['id' => $id, '_id' => 12]]], $response);
+    }
+
+    public function testGeneratorsAreAcceptedForConnections(): void
+    {
+        $response = $this->graphQL('/test/graphql/test2', '{ apiResourceObject(id: 1) {
+            apiResourceSubObjectAsCursorBasedSubQueryCollection(first: 2, howMany: 3, returnType: "Generator") { totalCount edges { node { _id } } }
+        } }');
+
+        $this->assertSame(
+            ['totalCount' => 3, 'edges' => [['node' => ['_id' => 1]], ['node' => ['_id' => 2]]]],
+            $response['data']['apiResourceObject']['apiResourceSubObjectAsCursorBasedSubQueryCollection']
+        );
+    }
+
+    public function testPaginatorWithoutTheRequestedPageIsReported(): void
+    {
+        $response = $this->graphQL('/test/graphql/test2', 'query ($after: String) { apiResourceObject(id: 1) {
+            apiResourceSubObjectAsCursorBasedSubQueryCollection(first: 2, after: $after, howMany: 10, returnType: "WrongPage") { totalCount }
+        } }', ['after' => ArrayCursor::fromOffset(5)]);
+
+        // Internal errors are masked in "message", details are in extensions.debugMessage (debug mode)
+        $this->assertStringContainsString('does not contain the requested page', json_encode($response['errors'][0]));
     }
 }

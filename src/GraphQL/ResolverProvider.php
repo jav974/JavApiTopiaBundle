@@ -246,31 +246,34 @@ class ResolverProvider
         }
 
         $connectionArguments = $this->getConnectionArguments($args);
-
-        if (is_array($data)) {
-            return ConnectionBuilder::fromArray($data, $connectionArguments) + ['totalCount' => count($data)];
-        }
-
-        $totalCount = $data->getTotalItems();
-        $connection = ConnectionBuilder::fromSlice($data->getCurrentPageResults(), $data->getCurrentPageOffset(), $totalCount, $connectionArguments);
+        $connection = $this->buildConnection($data, $connectionArguments);
 
         if ($connection === null && $reload !== null) {
-            $reloaded = $this->normalizeCollection($reload(ConnectionBuilder::requiredWindow($totalCount, $connectionArguments)));
-
-            $connection = is_array($reloaded)
-                ? ConnectionBuilder::fromArray($reloaded, $connectionArguments)
-                : ConnectionBuilder::fromSlice($reloaded->getCurrentPageResults(), $reloaded->getCurrentPageOffset(), $reloaded->getTotalItems(), $connectionArguments);
-            $totalCount = is_array($reloaded) ? count($reloaded) : $reloaded->getTotalItems();
+            $connection = $this->buildConnection(
+                $this->normalizeCollection($reload(ConnectionBuilder::requiredWindow($data instanceof PaginatorInterface ? $data->getTotalItems() : count($data), $connectionArguments))),
+                $connectionArguments
+            );
         }
 
-        if ($connection === null) {
-            throw new RuntimeException(sprintf(
-                'The paginator returned by resolver "%s" does not contain the requested page: use $context[\'pagination\'] to load it.',
-                $attribute->resolver
-            ));
+        return $connection ?? throw new RuntimeException(sprintf(
+            'The paginator returned by resolver "%s" does not contain the requested page: use $context[\'pagination\'] to load it.',
+            $attribute->resolver
+        ));
+    }
+
+    /**
+     * @param array<mixed>|PaginatorInterface $data
+     * @return array<string, mixed>|null null when a paginator does not contain the requested page
+     */
+    private function buildConnection(array|PaginatorInterface $data, ConnectionArguments $arguments): ?array
+    {
+        if (is_array($data)) {
+            return ConnectionBuilder::fromArray($data, $arguments) + ['totalCount' => count($data)];
         }
 
-        return $connection + ['totalCount' => $totalCount];
+        $connection = ConnectionBuilder::fromSlice($data->getCurrentPageResults(), $data->getCurrentPageOffset(), $data->getTotalItems(), $arguments);
+
+        return $connection === null ? null : $connection + ['totalCount' => $data->getTotalItems()];
     }
 
     /**
@@ -283,11 +286,7 @@ class ResolverProvider
             return $data;
         }
 
-        if ($data instanceof \Traversable) {
-            return iterator_to_array($data, false);
-        }
-
-        return [];
+        return $data instanceof \Traversable ? iterator_to_array($data, false) : [];
     }
 
     /**

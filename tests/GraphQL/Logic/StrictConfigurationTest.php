@@ -76,4 +76,18 @@ class StrictConfigurationTest extends AbstractApiTestCase
         $this->assertArrayHasKey('errors', $response);
         $this->assertStringContainsString('complexity', strtolower($response['errors'][0]['message']));
     }
+
+    public function testOffsetPaginationArgumentsAreValidated(): void
+    {
+        $query = '{ apiResourceObject(id: 1) { apiResourceSubObjectAsOffsetBasedSubQueryCollection(%s) { totalCount } } }';
+
+        $response = $this->graphQL('/test/graphql/test2', sprintf($query, 'limit: -1'));
+        $this->assertSame('Arguments "offset" and "limit" must be non-negative integers.', $response['errors'][0]['message']);
+
+        $response = $this->graphQL('/test/graphql/test2', sprintf($query, 'offset: -1'));
+        $this->assertSame('Arguments "offset" and "limit" must be non-negative integers.', $response['errors'][0]['message']);
+
+        $response = $this->graphQL('/test/graphql/test2', sprintf($query, 'limit: 6'));
+        $this->assertSame('Cannot request more than 5 items per page.', $response['errors'][0]['message']);
+    }
 }
