@@ -4,70 +4,38 @@ namespace Jav\ApiTopiaBundle\Cache;
 
 use Jav\ApiTopiaBundle\GraphQL\ResourceLoader;
 use Symfony\Component\HttpKernel\CacheWarmer\CacheWarmerInterface;
-use Symfony\Component\HttpKernel\Kernel;
 
-if (Kernel::VERSION_ID < 60400) {
-    class ResourcesWarmer implements CacheWarmerInterface
+class ResourcesWarmer implements CacheWarmerInterface
+{
+    /** @var array<string, mixed> */
+    private array $config = [];
+
+    public function __construct(private readonly ResourceLoader $resourceLoader)
     {
-        /** @var array<string, mixed> */
-        private array $config;
-
-        public function __construct(private readonly ResourceLoader $resourceLoader)
-        {
-        }
-
-        /**
-         * @param array<string, mixed> $config
-         */
-        public function setConfig(array $config): void
-        {
-            $this->config = $config;
-        }
-
-        public function isOptional(): bool
-        {
-            return false;
-        }
-
-        public function warmUp(string $cacheDir): array
-        {
-            foreach ($this->config as $schemaName => $config) {
-                $this->resourceLoader->loadResources($schemaName, $config['resource_directories'], true);
-            }
-
-            return [];
-        }
     }
-} else {
-    class ResourcesWarmer implements CacheWarmerInterface
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    public function setConfig(array $config): void
     {
-        /** @var array<string, mixed> */
-        private array $config;
+        $this->config = $config;
+    }
 
-        public function __construct(private readonly ResourceLoader $resourceLoader)
-        {
+    public function isOptional(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return string[]
+     */
+    public function warmUp(string $cacheDir, ?string $buildDir = null): array
+    {
+        foreach ($this->config as $schemaName => $config) {
+            $this->resourceLoader->loadResources($schemaName, $config['resource_directories'], true);
         }
 
-        /**
-         * @param array<string, mixed> $config
-         */
-        public function setConfig(array $config): void
-        {
-            $this->config = $config;
-        }
-
-        public function isOptional(): bool
-        {
-            return false;
-        }
-
-        public function warmUp(string $cacheDir, ?string $buildDir = null): array
-        {
-            foreach ($this->config as $schemaName => $config) {
-                $this->resourceLoader->loadResources($schemaName, $config['resource_directories'], true);
-            }
-
-            return [];
-        }
+        return [];
     }
 }

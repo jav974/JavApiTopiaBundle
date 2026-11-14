@@ -14,7 +14,7 @@ class UploadedFileDenormalizer implements DenormalizerInterface
      * @param array<mixed> $context
      * @throws InvalidArgumentException
      */
-    public function denormalize(mixed $data, string $type, string $format = null, array $context = []): ?UploadedFile
+    public function denormalize(mixed $data, string $type, ?string $format = null, array $context = []): ?UploadedFile
     {
         if ($data instanceof UploadedFile) {
             return $data;
@@ -37,7 +37,7 @@ class UploadedFileDenormalizer implements DenormalizerInterface
     /**
      * @param array<mixed> $context
      */
-    public function supportsDenormalization(mixed $data, string $type, string $format = null, array $context = []): bool
+    public function supportsDenormalization(mixed $data, string $type, ?string $format = null, array $context = []): bool
     {
         return $type === UploadedFile::class && ($data instanceof UploadedFileInterface || $data instanceof UploadedFile);
     }

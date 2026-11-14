@@ -1,8 +1,20 @@
-includes:
-	- phpstan-baseline.neon
-
 parameters:
-	checkGenericClassInNonGenericObjectType: false
 	level: 6
 	paths:
 		- src
+	ignoreErrors:
+		# Legacy PropertyInfo types only exist up to Symfony 7.x, they are used conditionally for Symfony 6.4 support
+		-
+			identifier: class.notFound
+			paths:
+				- src/Serializer/AttributeTypeExtractor.php
+				- src/Serializer/PropertyTypeDescriber.php
+			reportUnmatched: false
+		-
+			identifier: function.alreadyNarrowedType
+			path: src/Serializer/PropertyTypeDescriber.php
+			reportUnmatched: false
+		-
+			identifier: method.notFound
+			path: src/Serializer/PropertyTypeDescriber.php
+			reportUnmatched: false

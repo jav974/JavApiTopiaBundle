@@ -4,6 +4,7 @@ namespace Jav\ApiTopiaBundle\Test;
 
 use Jav\ApiTopiaBundle\GraphQL\Client;
 use JsonException;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,6 +13,11 @@ abstract class AbstractApiTestCase extends WebTestCase
 {
     protected Client $client;
 
+    protected KernelBrowser $kernelBrowser;
+
+    /** @var array<string, mixed> Options passed to the kernel (e.g. ['environment' => 'test_strict']) */
+    protected static array $kernelOptions = [];
+
     protected function setUp(): void
     {
         $this->setUpClient();
@@ -19,10 +25,10 @@ abstract class AbstractApiTestCase extends WebTestCase
 
     protected function setUpClient(): void
     {
-        $kernelBrowser = self::createClient([], [
+        $this->kernelBrowser = self::createClient(static::$kernelOptions, [
             'CONTENT_TYPE' => 'multipart/form-data'
         ]);
-        $this->client = new Client($kernelBrowser);
+        $this->client = new Client($this->kernelBrowser);
     }
 
     /**

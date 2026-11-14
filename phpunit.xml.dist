@@ -1,16 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd" backupGlobals="false" colors="true" bootstrap="./vendor/autoload.php">
-  <coverage>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+         failOnWarning="true"
+         failOnRisky="true"
+         displayDetailsOnTestsThatTriggerDeprecations="true"
+         displayDetailsOnTestsThatTriggerWarnings="true">
+  <source>
     <include>
       <directory>./src</directory>
     </include>
-  </coverage>
+  </source>
   <php>
     <ini name="error_reporting" value="-1"/>
-    <ini name="intl.default_locale" value="en"/>
-    <ini name="intl.error_level" value="0"/>
     <ini name="memory_limit" value="-1"/>
-    <server name="KERNEL_CLASS" value="Jav\ApiTopiaBundle\JavApiTopiaTestKernel"/>
+    <server name="KERNEL_CLASS" value="Jav\ApiTopiaBundle\Tests\JavApiTopiaTestKernel"/>
+    <server name="APP_ENV" value="test" force="true"/>
   </php>
   <testsuites>
     <testsuite name="unit">

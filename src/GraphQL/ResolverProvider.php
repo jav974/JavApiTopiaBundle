@@ -4,6 +4,7 @@ namespace Jav\ApiTopiaBundle\GraphQL;
 
 use Closure;
 use GraphQL\Deferred;
+use GraphQL\Error\UserError;
 use GraphQL\Type\Definition\ResolveInfo;
 use GraphQLRelay\Connection\ArrayConnection;
 use GraphQLRelay\Relay;
@@ -25,14 +26,37 @@ use Symfony\Component\DependencyInjection\ServiceLocator;
 
 class ResolverProvider
 {
-    /** @var array<string, DeferredResults> */
+    /** @var array<string, DeferredResults> Deferred results, indexed by field (parent type, field name and arguments) */
     private array $deferredBuffer = [];
 
+    private int $defaultLimit = 50;
+    private int $maxLimit = 0;
+
+    /**
+     * @param ServiceLocator<mixed> $locator
+     */
     public function __construct(
         private readonly ServiceLocator $locator,
         private readonly Serializer $serializer,
         private readonly MercureUrlGenerator $mercureUrlGenerator,
     ) {
+    }
+
+    /**
+     * @param array{default_limit?: int, max_limit?: int} $options
+     */
+    public function setPaginationOptions(array $options): void
+    {
+        $this->defaultLimit = max(1, (int) ($options['default_limit'] ?? $this->defaultLimit));
+        $this->maxLimit = max(0, (int) ($options['max_limit'] ?? $this->maxLimit));
+    }
+
+    /**
+     * Clears the deferred buffers. Called at the end of each request so that state never leaks between requests.
+     */
+    public function reset(): void
+    {
+        $this->deferredBuffer = [];
     }
 
     public function getResolver(string $class): QueryItemResolverInterface|QueryCollectionResolverInterface|MutationResolverInterface
@@ -103,36 +127,50 @@ class ResolverProvider
         return function ($root, array $args, $context, ResolveInfo $resolveInfo) use ($attribute, $schemaName) {
             $isPaginatedCollection = $attribute instanceof QueryCollection && $attribute->paginationEnabled;
             $isDeferred = ($attribute instanceof SubQuery || $attribute instanceof SubQueryCollection) && $attribute->deferred;
+            $isDeferred = $isDeferred === true;
             $context = $context ?? [];
             $context += $this->getQueryContext($resolveInfo, $schemaName, $root, $args, $isPaginatedCollection);
 
-            if ($isDeferred && $root) {
-                $rootClass = get_class($root);
-                $this->deferredBuffer[$rootClass] = $this->deferredBuffer[$rootClass] ?? new DeferredResults();
-                $this->deferredBuffer[$rootClass][$root] = $this->deferredBuffer[$rootClass][$root] ?? null;
+            if ($isDeferred) {
+                if (!is_object($root)) {
+                    throw new RuntimeException(sprintf('Deferred resolver "%s" requires its parent to be an object, got %s.', $attribute->resolver, get_debug_type($root)));
+                }
 
-                return new Deferred(function () use ($attribute, $context, $rootClass, $root) {
-                    $unresolved = $this->deferredBuffer[$rootClass]->getUnresolvedParents();
+                $bufferKey = $this->getDeferredBufferKey($resolveInfo, $args);
+                $buffer = $this->deferredBuffer[$bufferKey] ??= new DeferredResults();
+                $buffer->register($root);
+
+                return new Deferred(function () use ($attribute, $context, $buffer, $root, $args, $isPaginatedCollection) {
+                    $unresolved = $buffer->getUnresolvedParents();
 
                     if (!empty($unresolved)) {
                         $context['source'] = [
                             'collection' => $unresolved,
-                            '#itemResourceClass' => $rootClass,
+                            '#itemResourceClass' => get_class($root),
                             '#itemIdentifiers' => [
                                 'id' => array_map(fn (object $object) => $object->id ?? null, $unresolved),
                             ]
                         ];
 
-                        $this->execResolver($attribute, $context, $this->deferredBuffer[$rootClass]);
+                        $this->execResolver($attribute, $context, $buffer);
+                        $buffer->markResolved($unresolved);
                     }
 
-                    return $this->deferredBuffer[$rootClass][$root];
+                    $data = $buffer[$root];
+
+                    if ($isPaginatedCollection) {
+                        /** @var QueryCollection $attribute */
+                        $data = $this->handlePaginatedCollection($attribute, is_iterable($data) ? $data : [], $args, $context);
+                    }
+
+                    return $data;
                 });
             }
 
             $data = $this->execResolver($attribute, $context);
 
-            if ($isPaginatedCollection && $attribute instanceof QueryCollection) {
+            if ($isPaginatedCollection) {
+                /** @var QueryCollection $attribute */
                 $data = $this->handlePaginatedCollection($attribute, $data, $args, $context);
             }
 
@@ -144,14 +182,14 @@ class ResolverProvider
      * @param array<string, mixed> $args
      * @return array<string, mixed>
      */
-    private function getQueryContext(ResolveInfo $resolveInfo, string $schemaName, ?object $root, array $args, bool $isPaginatedCollection): array
+    private function getQueryContext(ResolveInfo $resolveInfo, string $schemaName, mixed $root, array $args, bool $isPaginatedCollection): array
     {
         $context = [
             'info' => $resolveInfo,
             'schema' => $schemaName,
         ];
 
-        if ($root) {
+        if (is_object($root)) {
             $context['source'] = [
                 'item' => $root,
                 '#itemResourceClass' => get_class($root),
@@ -166,11 +204,15 @@ class ResolverProvider
         }
 
         if ($isPaginatedCollection) {
+            $offset = 0;
+            $limit = 0;
             $this->toLimits($args, $offset, $limit);
 
             $context['pagination'] = [
                 'offset' => $offset,
-                'limit' => $limit
+                'limit' => $limit,
+                // A negative offset means "count from the end of the list" (array_slice semantics), when only 'last' is provided
+                'fromEnd' => $offset < 0,
             ];
         }
 
@@ -178,17 +220,28 @@ class ResolverProvider
     }
 
     /**
-     * @param array<object>|PaginatorInterface<object> $data
+     * @param iterable<mixed>|PaginatorInterface|null $data
      * @param array<string, mixed> $args
      * @param array<string, mixed> $context
      * @return array<string, mixed>
      */
-    private function handlePaginatedCollection(QueryCollection $attribute, array|PaginatorInterface $data, array $args, array $context): array
+    private function handlePaginatedCollection(QueryCollection $attribute, iterable|PaginatorInterface|null $data, array $args, array $context): array
     {
         $connectionData = [];
 
+        if ($data === null) {
+            $data = [];
+        } elseif ($data instanceof \Traversable && !$data instanceof PaginatorInterface) {
+            $data = iterator_to_array($data, false);
+        }
+
         if (is_array($data)) {
             if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
+                // Apply the default page size when the client does not ask for one, like the offset pagination does
+                if (!isset($args['first']) && !isset($args['last'])) {
+                    $args['first'] = $context['pagination']['limit'];
+                }
+
                 $connectionData = Relay::connectionFromArray($data, $args);
             } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
                 $connectionData = ['items' => array_slice($data, $context['pagination']['offset'], $context['pagination']['limit'])];
@@ -238,20 +291,37 @@ class ResolverProvider
      *
      * @param array<string, mixed> $filters
      */
-    private function toLimits(array $filters, ?int &$firstResult = null, ?int &$maxResults = null): void
+    private function toLimits(array $filters, int &$firstResult = 0, int &$maxResults = 0): void
     {
-        $maxResults = $filters['first'] ?? $filters['last'] ?? $filters['limit'] ?? 50;
-        $firstResult = $filters['offset'] ?? 0;
+        $maxResults = (int) ($filters['first'] ?? $filters['last'] ?? $filters['limit'] ?? $this->defaultLimit);
+
+        if ($maxResults < 0) {
+            throw new UserError('Pagination arguments "first", "last" and "limit" must be positive integers.');
+        }
+
+        if ($this->maxLimit > 0 && $maxResults > $this->maxLimit) {
+            throw new UserError(sprintf('Cannot request more than %d items per page.', $this->maxLimit));
+        }
+
+        $firstResult = max(0, (int) ($filters['offset'] ?? 0));
 
         // 'before' and 'after' are integers corresponding to the position of the element in the array
         // They are base64 encoded integer, so we have to decode them in order to compute something
 
         if (isset($filters['last']) && isset($filters['before'])) {
-            $firstResult = max(ArrayConnection::cursorToOffset($filters['before']) - $filters['last'], 0);
+            $firstResult = max((int) ArrayConnection::cursorToOffset($filters['before']) - $maxResults, 0);
         } elseif (isset($filters['first']) && isset($filters['after'])) {
-            $firstResult = ArrayConnection::cursorToOffset($filters['after']) + 1;
+            $firstResult = (int) ArrayConnection::cursorToOffset($filters['after']) + 1;
         } elseif (isset($filters['last'])) {
-            $firstResult = -$filters['last'];
+            $firstResult = -$maxResults;
         }
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     */
+    private function getDeferredBufferKey(ResolveInfo $resolveInfo, array $args): string
+    {
+        return $resolveInfo->parentType->name . '.' . $resolveInfo->fieldName . '#' . md5(serialize($args));
     }
 }

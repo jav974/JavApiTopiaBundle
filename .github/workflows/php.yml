@@ -10,42 +10,72 @@ permissions:
     contents: read
 
 jobs:
-    build:
+    tests:
         runs-on: ${{ matrix.operating-system }}
-        name: PHP ${{ matrix.php }} and Symfony ${{ matrix.symfony }} on ${{ matrix.operating-system }}
+        name: PHP ${{ matrix.php }} / Symfony ${{ matrix.symfony }} (${{ matrix.dependencies }}) on ${{ matrix.operating-system }}
         strategy:
+            fail-fast: false
             matrix:
-                operating-system: [ ubuntu-latest, windows-latest ]
-                php: [ '8.1', '8.2', '8.3' ]
-                symfony: [ '5.4.*', '6.4.*', '7.0.*', '7.1.*' ]
+                operating-system: [ ubuntu-latest ]
+                php: [ '8.1', '8.2', '8.3', '8.4', '8.5' ]
+                symfony: [ '6.4.*', '7.4.*', '8.1.*' ]
+                dependencies: [ 'highest' ]
                 exclude:
+                    # Symfony 7 requires PHP >= 8.2
                     - php: '8.1'
-                      symfony: '7.0.*'
+                      symfony: '7.4.*'
+                    # Symfony 8 requires PHP >= 8.4
                     - php: '8.1'
-                      symfony: '7.1.*'
+                      symfony: '8.1.*'
+                    - php: '8.2'
+                      symfony: '8.1.*'
+                    - php: '8.3'
+                      symfony: '8.1.*'
+                include:
+                    - operating-system: ubuntu-latest
+                      php: '8.1'
+                      symfony: '6.4.*'
+                      dependencies: 'lowest'
+                    - operating-system: windows-latest
+                      php: '8.4'
+                      symfony: '7.4.*'
+                      dependencies: 'highest'
 
         steps:
-            -   uses: actions/checkout@v3
+            -   uses: actions/checkout@v4
 
             -   name: Setup PHP ${{ matrix.php }}
-                uses: shivammathur/setup-php@verbose
+                uses: shivammathur/setup-php@v2
                 with:
                     php-version: ${{ matrix.php }}
                     tools: flex
-                env:
-                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    coverage: pcov
 
             -   name: Download dependencies
                 env:
                     SYMFONY_REQUIRE: ${{ matrix.symfony }}
-                uses: ramsey/composer-install@v1
+                uses: ramsey/composer-install@v3
+                with:
+                    dependency-versions: ${{ matrix.dependencies }}
 
-            -   name: Run test suite on PHP ${{ matrix.php }} and Symfony ${{ matrix.symfony }}
-                run: composer run-script test
+            -   name: Run test suite
+                run: vendor/bin/phpunit --coverage-clover coverage.xml
 
             -   name: Upload coverage reports to Codecov
-                uses: codecov/codecov-action@v3
+                uses: codecov/codecov-action@v5
                 with:
                     token: ${{ secrets.CODECOV_TOKEN }}
-                    verbose: true
-                if: matrix.operating-system == 'ubuntu-latest' && matrix.php == '8.1' && matrix.symfony == '5.4.*'
+                # One upload per Symfony major: version-specific code paths (PropertyInfo legacy types / TypeInfo) are merged by Codecov
+                if: matrix.operating-system == 'ubuntu-latest' && matrix.php == '8.4' && matrix.dependencies == 'highest'
+
+    static-analysis:
+        runs-on: ubuntu-latest
+        name: PHPStan
+        steps:
+            -   uses: actions/checkout@v4
+            -   uses: shivammathur/setup-php@v2
+                with:
+                    php-version: '8.4'
+                    coverage: none
+            -   uses: ramsey/composer-install@v3
+            -   run: vendor/bin/phpstan --no-progress

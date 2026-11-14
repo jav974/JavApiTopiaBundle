@@ -5,11 +5,12 @@ namespace Jav\ApiTopiaBundle\GraphQL;
 use InvalidArgumentException;
 use JsonException;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
-use Symfony\Component\HttpClient\CurlHttpClient;
+use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Mime\Part\DataPart;
 use Symfony\Component\Mime\Part\Multipart\FormDataPart;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
 class Client
@@ -18,15 +19,14 @@ class Client
     public const CONTENT_TYPE_GRAPHQL = 'application/graphql';
     public const CONTENT_TYPE_FORM_DATA = 'multipart/form-data';
 
-    protected CurlHttpClient|KernelBrowser $client;
+    protected HttpClientInterface|KernelBrowser $client;
 
-    public function __construct(?KernelBrowser $client = null)
+    /**
+     * @param array<string, string> $defaultHeaders Headers sent with every request (e.g. ['Cookie' => 'XDEBUG_SESSION=PHPSTORM'] to debug)
+     */
+    public function __construct(KernelBrowser|HttpClientInterface|null $client = null, private readonly array $defaultHeaders = [])
     {
-        if ($client !== null) {
-            $this->client = $client;
-        } else {
-            $this->client = new CurlHttpClient();
-        }
+        $this->client = $client ?? HttpClient::create();
     }
 
     /**
@@ -61,9 +61,11 @@ class Client
         $query = ['operations' => ['query' => $gql], 'map' => []];
 
         foreach ($files as $fileParamName => $file) {
+            // Non numeric keys: numeric form field names are dropped by FormDataPart
+            $key = "file$i";
             $variables[$fileParamName] = null;
-            $query['map']["$i"] = ["variables.$fileParamName"];
-            $_files[$i] = $file;
+            $query['map'][$key] = ["variables.$fileParamName"];
+            $_files[$key] = $file;
             ++$i;
         }
 
@@ -71,8 +73,8 @@ class Client
             $query['operations']['variables'] = $variables;
         }
 
-        $query['operations'] = json_encode($query['operations']);
-        $query['map'] = json_encode($query['map']);
+        $query['operations'] = json_encode($query['operations'], JSON_THROW_ON_ERROR);
+        $query['map'] = json_encode($query['map'], JSON_THROW_ON_ERROR);
 
         if ($this->client instanceof KernelBrowser) {
             $this->client->request(
@@ -96,7 +98,7 @@ class Client
             'POST',
             $endpoint,
             [
-                'headers' => $formData->getPreparedHeaders()->toArray() + ['Cookie' => 'XDEBUG_SESSION=eclipse'],
+                'headers' => $formData->getPreparedHeaders()->toArray() + $this->defaultHeaders,
                 'body' => $formData->bodyToString()
             ]
         );
@@ -109,17 +111,19 @@ class Client
     {
         if (!empty($variables)) {
             $endpoint .= !str_contains($endpoint, '?') ? '?' : '&';
-            $endpoint .= http_build_query(['variables' => $variables]);
+            $endpoint .= http_build_query(['variables' => json_encode($variables, JSON_THROW_ON_ERROR)]);
+        }
+
+        if ($this->client instanceof KernelBrowser) {
+            $this->client->request('POST', $endpoint, [], [], ['CONTENT_TYPE' => self::CONTENT_TYPE_GRAPHQL], $gql);
+            return $this->client->getResponse();
         }
 
         return $this->client->request(
             'POST',
             $endpoint,
             [
-                'headers' => [
-                    'Content-Type' => self::CONTENT_TYPE_GRAPHQL,
-                    'Cookie' => 'XDEBUG_SESSION=eclipse'
-                ],
+                'headers' => ['Content-Type' => self::CONTENT_TYPE_GRAPHQL] + $this->defaultHeaders,
                 'body' => $gql
             ]
         );
@@ -145,11 +149,8 @@ class Client
             'POST',
             $endpoint,
             [
-                'headers' => [
-                    'Content-Type' => self::CONTENT_TYPE_JSON,
-                    'Cookie' => 'XDEBUG_SESSION=eclipse'
-                ],
-                'body' => json_encode($body)
+                'headers' => ['Content-Type' => self::CONTENT_TYPE_JSON] + $this->defaultHeaders,
+                'body' => json_encode($body, JSON_THROW_ON_ERROR)
             ]
         );
     }

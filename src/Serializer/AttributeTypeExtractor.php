@@ -6,7 +6,8 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 use Symfony\Component\PropertyInfo\PropertyDescriptionExtractorInterface;
 use Symfony\Component\PropertyInfo\PropertyTypeExtractorInterface;
-use Symfony\Component\PropertyInfo\Type;
+use Symfony\Component\PropertyInfo\Type as LegacyType;
+use Symfony\Component\TypeInfo\Type;
 use Symfony\Component\Serializer\Mapping\ClassMetadata;
 use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactoryInterface;
 
@@ -17,16 +18,28 @@ class AttributeTypeExtractor implements PropertyTypeExtractorInterface, Property
     }
 
     /**
+     * Symfony >= 7.1 (TypeInfo).
+     *
      * @param array<mixed> $context
      */
     public function getType(string $class, string $property, array $context = []): ?Type
     {
-        return $this->getTypes($class, $property, $context)[0] ?? null;
+        $attribute = $this->getAttributeForProperty($class, $property);
+
+        if ($attribute?->output === null || !class_exists(Type::class)) {
+            return null;
+        }
+
+        $objectType = Type::object($attribute->output);
+
+        return Type::nullable($attribute instanceof QueryCollection ? Type::list($objectType) : $objectType);
     }
 
     /**
+     * Symfony < 8.0 (legacy PropertyInfo types).
+     *
      * @param array<mixed> $context
-     * @return Type[]|null
+     * @return LegacyType[]|null
      */
     public function getTypes(string $class, string $property, array $context = []): ?array
     {
@@ -39,14 +52,14 @@ class AttributeTypeExtractor implements PropertyTypeExtractorInterface, Property
         $isCollection = $attribute instanceof QueryCollection;
 
         return [
-            new Type(
-                $isCollection ? Type::BUILTIN_TYPE_ARRAY : Type::BUILTIN_TYPE_OBJECT,
+            new LegacyType(
+                $isCollection ? LegacyType::BUILTIN_TYPE_ARRAY : LegacyType::BUILTIN_TYPE_OBJECT,
                 true,
-                $isCollection ? Type::BUILTIN_TYPE_ARRAY : $attribute->output,
+                $isCollection ? null : $attribute->output,
                 $isCollection,
                 null,
-                !$isCollection ? null : new Type(
-                    Type::BUILTIN_TYPE_OBJECT,
+                !$isCollection ? null : new LegacyType(
+                    LegacyType::BUILTIN_TYPE_OBJECT,
                     true,
                     $attribute->output
                 ),

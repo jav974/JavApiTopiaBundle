@@ -3,22 +3,35 @@
 namespace Jav\ApiTopiaBundle\Api\GraphQL;
 
 use ArrayAccess;
+use SplObjectStorage;
 
+/**
+ * Holds the results of a deferred (batched) resolver, indexed by parent object.
+ *
+ * @implements ArrayAccess<mixed, object|array<mixed>|null>
+ */
 class DeferredResults implements ArrayAccess
 {
-    /** @var array<int, object[]>> */
-    private array $results = [];
+    /** @var SplObjectStorage<object, array{0: object|array<mixed>|null, 1: bool}> parent => [result, resolved] */
+    private SplObjectStorage $results;
+
+    public function __construct()
+    {
+        $this->results = new SplObjectStorage();
+    }
 
     /**
+     * Returns the parents for which the resolver has not been executed yet.
+     *
      * @return object[]
      */
     public function getUnresolvedParents(): array
     {
         $unresolved = [];
 
-        foreach ($this->results as $result) {
-            if (empty($result[1])) {
-                $unresolved[] = $result[0];
+        foreach ($this->results as $parent) {
+            if (!$this->results[$parent][1]) {
+                $unresolved[] = $parent;
             }
         }
 
@@ -33,9 +46,30 @@ class DeferredResults implements ArrayAccess
         $this->offsetSet($parent, $result);
     }
 
+    /**
+     * @internal Registers a parent waiting to be resolved
+     */
+    public function register(object $parent): void
+    {
+        if (!isset($this->results[$parent])) {
+            $this->results[$parent] = [null, false];
+        }
+    }
+
+    /**
+     * @internal Marks the given parents as resolved, even if the resolver did not provide any result for them
+     * @param object[] $parents
+     */
+    public function markResolved(array $parents): void
+    {
+        foreach ($parents as $parent) {
+            $this->results[$parent] = [isset($this->results[$parent]) ? $this->results[$parent][0] : null, true];
+        }
+    }
+
     public function offsetExists(mixed $offset): bool
     {
-        return $this->getOffsetForParent($offset) !== false;
+        return is_object($offset) && isset($this->results[$offset]);
     }
 
     /**
@@ -43,13 +77,11 @@ class DeferredResults implements ArrayAccess
      */
     public function offsetGet(mixed $offset): object|array|null
     {
-        foreach ($this->results as $result) {
-            if ($result[0] === $offset) {
-                return $result[1];
-            }
+        if (!$this->offsetExists($offset)) {
+            return null;
         }
 
-        return null;
+        return $this->results[$offset][0];
     }
 
     /**
@@ -57,13 +89,11 @@ class DeferredResults implements ArrayAccess
      */
     public function offsetSet(mixed $offset, mixed $value): void
     {
-        $offsetForParent = $this->getOffsetForParent($offset);
-
-        if ($offsetForParent === false) {
-            $this->results[] = [$offset, $value];
-        } else {
-            $this->results[$offsetForParent][1] = $value;
+        if (!is_object($offset)) {
+            throw new \InvalidArgumentException('DeferredResults keys must be the parent objects.');
         }
+
+        $this->results[$offset] = [$value, true];
     }
 
     /**
@@ -71,21 +101,8 @@ class DeferredResults implements ArrayAccess
      */
     public function offsetUnset(mixed $offset): void
     {
-        foreach ($this->results as $key => $result) {
-            if ($result[0] === $offset) {
-                unset($this->results[$key]);
-            }
+        if ($this->offsetExists($offset)) {
+            unset($this->results[$offset]);
         }
-    }
-
-    private function getOffsetForParent(object $parent): int|false
-    {
-        foreach ($this->results as $key => $result) {
-            if ($result[0] === $parent) {
-                return $key;
-            }
-        }
-
-        return false;
     }
 }

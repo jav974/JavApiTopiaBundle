@@ -23,16 +23,15 @@ services:
 
     jav_apitopia.graphql.request_handler:
         class: Jav\ApiTopiaBundle\GraphQL\RequestHandler
-        arguments: [ '@jav_apitopia.graphql.schema_builder' ]
+        arguments: [ '@jav_apitopia.graphql.schema_builder', '@jav_apitopia.graphql.resolver_provider' ]
         tags: [ controller.service_arguments ]
-        autowire: true
-        autoconfigure: true
+        public: true
 
     jav_apitopia.controller.graphiql:
         class: Jav\ApiTopiaBundle\Controller\GraphiQLController
+        arguments: { $endpoints: [], $twig: '@?twig' }
         tags: [ 'controller.service_arguments' ]
-        autowire: true
-        autoconfigure: true
+        public: true
 
     jav_apitopia.graphql.schema_builder:
         class: Jav\ApiTopiaBundle\GraphQL\SchemaBuilder
@@ -41,7 +40,7 @@ services:
 
     jav_apitopia.graphql.resource_loader:
         class: Jav\ApiTopiaBundle\GraphQL\ResourceLoader
-        arguments: [ '%kernel.cache_dir%' ]
+        arguments: [ '%kernel.cache_dir%', '%kernel.debug%' ]
 
     jav_apitopia.graphql.reflection_utils:
         class: Jav\ApiTopiaBundle\GraphQL\ReflectionUtils
@@ -56,10 +55,12 @@ services:
     jav_apitopia.graphql.resolver_provider:
         class: Jav\ApiTopiaBundle\GraphQL\ResolverProvider
         arguments: [ !tagged_locator { tag: 'apitopia.graphql_resolver' }, '@jav_apitopia.serializer.serializer', '@jav_apitopia.graphql.mercure_url_generator' ]
+        tags:
+            - { name: kernel.reset, method: reset }
 
     jav_apitopia.graphql.type_resolver:
         class: Jav\ApiTopiaBundle\GraphQL\TypeResolver
-        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.graphql.resolver_provider', '@jav_apitopia.serializer.serializer', '@jav_apitopia.graphql.reflection_utils', '@jav_apitopia.graphql.type_registry', '@jav_apitopia.graphql.fields_builder' ]
+        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.graphql.resolver_provider', '@jav_apitopia.serializer.serializer', '@jav_apitopia.graphql.reflection_utils', '@jav_apitopia.graphql.type_registry', '@jav_apitopia.graphql.fields_builder', '@?jav_apitopia.graphql.node_resolver' ]
 
     jav_apitopia.graphql.mercure_url_generator:
         class: Jav\ApiTopiaBundle\GraphQL\MercureUrlGenerator

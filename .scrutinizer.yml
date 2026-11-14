@@ -1,0 +1,28 @@
+build:
+    image: default-jammy
+    environment:
+        php:
+            version: 8.3
+    nodes:
+        analysis:
+            project_setup:
+                override:
+                    - 'true'
+            tests:
+                override:
+                    # phpcs-run is not used: it installs squizlabs/php_codesniffer 3.7.1, blocked by a security advisory
+                    - php-scrutinizer-run
+filter:
+    excluded_paths:
+        - 'tests/GraphQL/Logic/*'
+        - 'tests/GraphQL/Output/*'
+    dependency_paths:
+        - 'tests/GraphQL/Schema/*'
+checks:
+    php: true
+coding_style:
+    php:
+        spaces:
+            around_operators:
+                bitwise: false
+                concatenation: true

@@ -2,6 +2,9 @@
 
 namespace Jav\ApiTopiaBundle\Pagination;
 
+/**
+ * @extends \Traversable<int, mixed>
+ */
 interface PaginatorInterface extends \Traversable, \Countable
 {
     public function getTotalItems(): int;

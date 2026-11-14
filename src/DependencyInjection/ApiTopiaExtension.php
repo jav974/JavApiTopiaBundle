@@ -4,6 +4,8 @@ namespace Jav\ApiTopiaBundle\DependencyInjection;
 
 use Exception;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\DeferredResolverInterface;
+use Jav\ApiTopiaBundle\DependencyInjection\Compiler\NodeResolverPass;
+use Jav\ApiTopiaBundle\GraphQL\NodeResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\MutationResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
@@ -31,6 +33,8 @@ class ApiTopiaExtension extends ConfigurableExtension
             ->addTag('apitopia.graphql_resolver');
         $container->registerForAutoconfiguration(DeferredResolverInterface::class)
             ->addTag('apitopia.graphql_resolver');
+        $container->registerForAutoconfiguration(NodeResolverInterface::class)
+            ->addTag(NodeResolverPass::TAG);
 
         $loader = new YamlFileLoader($container, new FileLocator(__DIR__ . '/../../config'));
         $loader->load('services.yaml');
@@ -44,15 +48,31 @@ class ApiTopiaExtension extends ConfigurableExtension
             ->getDefinition('jav_apitopia.cache.resources_warmer')
             ->addMethodCall('setConfig', [$mergedConfig['schemas'] ?? []]);
 
+        $container
+            ->getDefinition('jav_apitopia.graphql.request_handler')
+            ->setArgument(2, [
+                'debug' => $mergedConfig['debug'],
+                'error_http_status_code' => $mergedConfig['error_http_status_code'],
+                'batching' => $mergedConfig['batching'],
+                'introspection' => $mergedConfig['introspection'],
+                'max_query_depth' => $mergedConfig['max_query_depth'],
+                'max_query_complexity' => $mergedConfig['max_query_complexity'],
+            ]);
+
+        $container
+            ->getDefinition('jav_apitopia.graphql.resolver_provider')
+            ->addMethodCall('setPaginationOptions', [$mergedConfig['pagination']]);
+
         $graphQLEndpoints = [];
 
-        foreach ($mergedConfig['schemas'] as $schemaName => $schema) {
+        foreach ($mergedConfig['schemas'] ?? [] as $schemaName => $schema) {
             $graphQLEndpoints[$schemaName] = $schema['path'];
         }
 
         $container
             ->getDefinition('jav_apitopia.loader.route')
-            ->addMethodCall('setGraphQLEndpoints', [$graphQLEndpoints]);
+            ->addMethodCall('setGraphQLEndpoints', [$graphQLEndpoints])
+            ->addMethodCall('setGraphiQLEnabled', [$mergedConfig['graphiql']['enabled']]);
 
         $container
             ->getDefinition('jav_apitopia.controller.graphiql')
