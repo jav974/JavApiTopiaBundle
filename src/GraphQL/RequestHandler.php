@@ -3,12 +3,14 @@
 namespace Jav\ApiTopiaBundle\GraphQL;
 
 use GraphQL\Error\DebugFlag;
-use GraphQL\Error\FormattedError;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Server\ServerConfig;
 use GraphQL\Server\StandardServer;
 use GraphQL\Upload\UploadMiddleware;
 use GraphQL\Validator\DocumentValidator;
+use Jav\ApiTopiaBundle\Error\ClientException;
+use Jav\ApiTopiaBundle\Error\ErrorCode;
+use Jav\ApiTopiaBundle\Error\ErrorFormatter;
 use GraphQL\Validator\Rules\DisableIntrospection;
 use GraphQL\Validator\Rules\QueryComplexity;
 use GraphQL\Validator\Rules\QueryDepth;
@@ -24,6 +26,8 @@ use Symfony\Component\HttpFoundation\Request;
 
 class RequestHandler
 {
+    private readonly ErrorFormatter $errorFormatter;
+
     /**
      * @param array{debug?: bool|string, error_http_status_code?: int, batching?: bool, introspection?: bool, max_query_depth?: int, max_query_complexity?: int} $options
      */
@@ -31,7 +35,9 @@ class RequestHandler
         private readonly SchemaBuilder $schemaBuilder,
         private readonly ?ResolverProvider $resolverProvider = null,
         private array $options = [],
+        ?ErrorFormatter $errorFormatter = null,
     ) {
+        $this->errorFormatter = $errorFormatter ?? new ErrorFormatter();
         $this->options += [
             'debug' => false,
             'error_http_status_code' => 500,
@@ -69,6 +75,7 @@ class RequestHandler
                 ->setSchema($this->schemaBuilder->getSchema($schemaName))
                 ->setQueryBatching((bool) $this->options['batching'])
                 ->setDebugFlag($debugFlag)
+                ->setErrorsHandler(fn (array $errors) => $this->errorFormatter->formatAll($errors, $debugFlag))
                 ->setValidationRules($this->getValidationRules())
             ;
 
@@ -87,10 +94,16 @@ class RequestHandler
 
             return new JsonResponse($jsonResult, $statusCode, [], true);
         } catch (\Throwable $e) {
-            return new JsonResponse([
-                'errors' => [
-                    FormattedError::createFromException($e, $debugFlag)
-                ]], 500);
+            $error = $this->errorFormatter->format($e, $debugFlag);
+
+            if ($error['extensions']['code'] === ErrorCode::INTERNAL_SERVER_ERROR) {
+                $this->errorFormatter->log($e);
+
+                return new JsonResponse(['errors' => [$error]], 500);
+            }
+
+            // The request itself is invalid (malformed JSON body...)
+            return new JsonResponse(['errors' => [$error]], 400);
         }
     }
 
@@ -150,7 +163,7 @@ class RequestHandler
         $variables = $queryParams['variables'] ?? null;
 
         if (is_string($variables) && $variables !== '') {
-            $variables = json_decode($variables, true, flags: JSON_THROW_ON_ERROR);
+            $variables = $this->decodeJson($variables);
         }
 
         $parsedBody = ['query' => $body];
@@ -186,6 +199,18 @@ class RequestHandler
     /**
      * Uses the PSR-15 API of the upload middleware, available in every supported version of ecodev/graphql-upload.
      */
+    /**
+     * @throws ClientException
+     */
+    private function decodeJson(string $json): mixed
+    {
+        try {
+            return json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new ClientException(sprintf('Invalid JSON: %s', $e->getMessage()), ErrorCode::BAD_USER_INPUT, [], $e);
+        }
+    }
+
     private function handleMultipartFormData(ServerRequestInterface $request): ServerRequestInterface|ResponseInterface
     {
         $handler = new class () implements RequestHandlerInterface {
@@ -209,6 +234,6 @@ class RequestHandler
      */
     private function handleApplicationJson(ServerRequestInterface $request): ServerRequestInterface
     {
-        return $request->withParsedBody(json_decode((string) $request->getBody(), true, flags: JSON_THROW_ON_ERROR));
+        return $request->withParsedBody($this->decodeJson((string) $request->getBody()));
     }
 }

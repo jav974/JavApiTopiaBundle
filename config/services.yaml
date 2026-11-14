@@ -23,7 +23,7 @@ services:
 
     jav_apitopia.graphql.request_handler:
         class: Jav\ApiTopiaBundle\GraphQL\RequestHandler
-        arguments: [ '@jav_apitopia.graphql.schema_builder', '@jav_apitopia.graphql.resolver_provider' ]
+        arguments: [ '@jav_apitopia.graphql.schema_builder', '@jav_apitopia.graphql.resolver_provider', [], '@jav_apitopia.error.formatter' ]
         tags: [ controller.service_arguments ]
         public: true
 
@@ -55,6 +55,8 @@ services:
     jav_apitopia.graphql.resolver_provider:
         class: Jav\ApiTopiaBundle\GraphQL\ResolverProvider
         arguments: [ !tagged_locator { tag: 'apitopia.graphql_resolver' }, '@jav_apitopia.serializer.serializer', '@jav_apitopia.graphql.mercure_url_generator' ]
+        calls:
+            - [ setValidator, [ '@?validator' ] ]
         tags:
             - { name: kernel.reset, method: reset }
 
@@ -78,3 +80,9 @@ services:
     jav_apitopia.graphql.fields_builder:
         class: Jav\ApiTopiaBundle\GraphQL\FieldsBuilder
         arguments: [ '@jav_apitopia.graphql.type_registry', '@jav_apitopia.graphql.resolver_provider' ]
+
+    jav_apitopia.error.formatter:
+        class: Jav\ApiTopiaBundle\Error\ErrorFormatter
+        arguments: [ [], '@?logger' ]
+        tags:
+            - { name: monolog.logger, channel: apitopia }

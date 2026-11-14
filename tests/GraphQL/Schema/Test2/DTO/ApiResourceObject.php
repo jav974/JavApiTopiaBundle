@@ -9,6 +9,7 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQuery;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQueryCollection;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\DTO\Input\SimpleInputObject;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\DTO\Input\ValidatedInput;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\DTO\Input\UploadInputObject;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObject2CollectionResolver;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObject2ItemResolver;
@@ -55,6 +56,23 @@ use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\SimpleMutationResolve
             name: 'createWithFileUploadInputDeserialized',
             resolver: FileUploadMutationResolver::class,
             input: UploadInputObject::class,
+        ),
+        new Mutation(
+            name: 'createValidated',
+            resolver: SimpleMutationResolver::class,
+            input: ValidatedInput::class,
+        ),
+        new Mutation(
+            name: 'createValidatedStrict',
+            resolver: SimpleMutationResolver::class,
+            input: ValidatedInput::class,
+            validationGroups: ['strict'],
+        ),
+        new Mutation(
+            name: 'createNotValidated',
+            resolver: SimpleMutationResolver::class,
+            input: ValidatedInput::class,
+            validate: false,
         ),
         new Mutation(
             name: 'createWithFileUploadInputRaw',

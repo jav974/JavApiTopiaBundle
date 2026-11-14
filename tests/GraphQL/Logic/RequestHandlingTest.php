@@ -104,9 +104,11 @@ class RequestHandlingTest extends AbstractApiTestCase
     {
         $this->kernelBrowser->request('POST', '/test/graphql/test1', [], [], ['CONTENT_TYPE' => 'application/json'], '{not json');
 
-        $this->assertSame(500, $this->kernelBrowser->getResponse()->getStatusCode());
+        // The request is invalid: client error
+        $this->assertSame(400, $this->kernelBrowser->getResponse()->getStatusCode());
         $response = json_decode($this->kernelBrowser->getResponse()->getContent(), true);
-        $this->assertArrayHasKey('errors', $response);
+        $this->assertSame('BAD_USER_INPUT', $response['errors'][0]['extensions']['code']);
+        $this->assertStringStartsWith('Invalid JSON', $response['errors'][0]['message']);
     }
 
     public function testNegativePageSizeIsRejected(): void

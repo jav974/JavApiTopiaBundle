@@ -45,10 +45,13 @@
     "squizlabs/php_codesniffer": "^3.7",
     "phpcompatibility/php-compatibility": "^9.3",
     "symfony/browser-kit": "^6.4 || ^7.0 || ^8.0",
-    "symfony/mercure-bundle": "^0.3.7 || ^0.4 || ^0.5 || ^0.6 || ^0.7"
+    "symfony/mercure-bundle": "^0.3.7 || ^0.4 || ^0.5 || ^0.6 || ^0.7",
+    "symfony/validator": "^6.4 || ^7.0 || ^8.0",
+    "symfony/security-core": "^6.4 || ^7.0 || ^8.0"
   },
   "suggest": {
-    "symfony/mercure-bundle": "Required to use GraphQL subscriptions (Subscription attribute)"
+    "symfony/mercure-bundle": "Required to use GraphQL subscriptions (Subscription attribute)",
+    "symfony/validator": "Validates mutation inputs (constraints on input classes)"
   },
   "conflict": {
     "symfony/mercure-bundle": "<0.3.7"

@@ -38,3 +38,4 @@ Key differences are:
 - [Use deferred subqueries](docs/deferred_subqueries.md)
 - [Use enums](docs/enums.md)
 - [Relay compliance](docs/relay.md)
+- [Errors and validation](docs/errors.md)

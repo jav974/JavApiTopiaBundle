@@ -23,6 +23,15 @@
 - Introspection of an unknown type (`__type(name: "Unknown")`) returns `null` instead of an error.
 - The resource cache is invalidated when the `resource_directories` of a schema change.
 
+### Errors and validation
+
+- Every GraphQL error has a code in `extensions.code` (Apollo conventions: `BAD_USER_INPUT`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `INTERNAL_SERVER_ERROR`, `GRAPHQL_PARSE_FAILED`, `GRAPHQL_VALIDATION_FAILED`). See [docs/errors.md](docs/errors.md).
+- New `ClientException` (with `notFound()`, `forbidden()`, `unauthenticated()`), whose message is always exposed, with custom codes and extensions.
+- HTTP exceptions, Symfony Security and Validator exceptions are mapped to codes; application exceptions can be mapped with the new `error_mapping` option.
+- Mutation inputs are validated with the Symfony Validator when it is installed; violations are returned in `extensions.violations` with their path (e.g. `input.email`). New `Mutation` options: `validate`, `validationGroups`.
+- Internal errors are logged (level `error`, channel `apitopia`). They were not logged before.
+- A malformed request body returns a 400 with a `BAD_USER_INPUT` error, instead of a 500.
+
 ### Performance
 
 - Schemas are built lazily: only the root fields and types used by a request are built. What a schema contains is read from an index cached in the cache directory, built by `cache:warmup` (or on first use) and refreshed in debug mode when a resource directory changes.

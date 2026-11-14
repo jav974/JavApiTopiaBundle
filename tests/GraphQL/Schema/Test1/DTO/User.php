@@ -20,7 +20,7 @@ use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\UsersResolver;
     graphQLOperations: [
         new Query(resolver: UserResolver::class, args: ['id' => ['type' => 'Int!']], description: "Get a user"),
         new QueryCollection(resolver: UsersResolver::class, paginationEnabled: false, description: "Get all users"),
-        new Query(resolver: FailingResolver::class, name: 'failingUser', description: "Always throws"),
+        new Query(resolver: FailingResolver::class, name: 'failingUser', args: ['kind' => ['type' => 'String']], description: "Always throws"),
     ]
 )]
 class User
