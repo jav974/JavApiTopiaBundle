@@ -18,7 +18,7 @@ jobs:
             matrix:
                 operating-system: [ ubuntu-latest ]
                 php: [ '8.1', '8.2', '8.3', '8.4', '8.5' ]
-                symfony: [ '6.4.*', '7.4.*', '8.0.*' ]
+                symfony: [ '6.4.*', '7.4.*', '8.1.*' ]
                 dependencies: [ 'highest' ]
                 exclude:
                     # Symfony 7 requires PHP >= 8.2
@@ -26,11 +26,11 @@ jobs:
                       symfony: '7.4.*'
                     # Symfony 8 requires PHP >= 8.4
                     - php: '8.1'
-                      symfony: '8.0.*'
+                      symfony: '8.1.*'
                     - php: '8.2'
-                      symfony: '8.0.*'
+                      symfony: '8.1.*'
                     - php: '8.3'
-                      symfony: '8.0.*'
+                      symfony: '8.1.*'
                 include:
                     - operating-system: ubuntu-latest
                       php: '8.1'
