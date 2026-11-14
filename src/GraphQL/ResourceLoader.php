@@ -45,42 +45,64 @@ class ResourceLoader
             return;
         }
 
-        // The directories are part of the key: changing them must not reuse a cache built from other directories
-        $key = $schemaName . '.' . substr(hash('xxh128', serialize($resourceDirectories)), 0, 16);
-        $cache = new ConfigCache("$this->cacheDir/apitopia/resources.$key.php", $this->debug);
+        $cache = new ConfigCache($this->getCachePath('resources', $schemaName, $resourceDirectories), $this->debug);
 
         if ($invalidateCache || !$cache->isFresh()) {
             $classes = $this->discoverClasses($resourceDirectories);
-            $cache->write(
-                '<?php return ' . var_export($classes, true) . ';' . PHP_EOL,
-                array_map(fn (string $directory) => new DirectoryResource($directory, '/\.php$/'), $resourceDirectories)
-            );
+            $cache->write('<?php return ' . var_export($classes, true) . ';' . PHP_EOL, $this->getCacheResources($resourceDirectories));
         } else {
             $classes = require $cache->getPath();
         }
 
+        // Only the class list is loaded here: classes are reflected when they are used (see getResource())
         $this->resources[$schemaName] = [];
         $shortNames = [];
 
         foreach ($classes as $classPath => $type) {
-            $resource = $type === 'enum'
-                ? ['type' => 'enum', 'name' => (new ReflectionEnum($classPath))->getShortName()]
-                : $this->buildClassResource($classPath);
+            $name = ReflectionUtils::getClassNameFromClassPath($classPath);
 
             // GraphQL type names are derived from short class names, they must be unique within a schema
-            if (isset($shortNames[$resource['name']])) {
+            if (isset($shortNames[$name])) {
                 throw new \LogicException(sprintf(
                     'Classes "%s" and "%s" would both produce the GraphQL type "%s" in schema "%s". Rename one of them or move it to another schema.',
-                    $shortNames[$resource['name']],
+                    $shortNames[$name],
                     $classPath,
-                    $resource['name'],
+                    $name,
                     $schemaName
                 ));
             }
 
-            $shortNames[$resource['name']] = $classPath;
-            $this->resources[$schemaName][$classPath] = $resource;
+            $shortNames[$name] = $classPath;
+            $this->resources[$schemaName][$classPath] = ['type' => $type, 'name' => $name];
         }
+    }
+
+    /**
+     * Path of a cache file of a schema. The resource directories are part of the key: changing them must not
+     * reuse a cache built from other directories.
+     *
+     * @param string[] $resourceDirectories
+     * @param array<mixed> $extraKey
+     */
+    public function getCachePath(string $kind, string $schemaName, array $resourceDirectories, array $extraKey = []): string
+    {
+        $key = substr(hash('xxh128', serialize([$resourceDirectories, $extraKey])), 0, 16);
+
+        return "$this->cacheDir/apitopia/$kind.$schemaName.$key.php";
+    }
+
+    /**
+     * @param string[] $resourceDirectories
+     * @return DirectoryResource[]
+     */
+    public function getCacheResources(array $resourceDirectories): array
+    {
+        return array_map(fn (string $directory) => new DirectoryResource($directory, '/\.php$/'), $resourceDirectories);
+    }
+
+    public function isDebug(): bool
+    {
+        return $this->debug;
     }
 
     /**
@@ -192,13 +214,38 @@ class ResourceLoader
     }
 
     /**
+     * Returns the resources of a schema, reflecting all of them. Prefer getResource() for a single class.
+     *
      * @return array<string, array<string, mixed>>
      */
     public function getResources(string $schemaName, string $type = 'class'): array
     {
-        $collection = $this->resources[$schemaName] ?? [];
+        $resources = [];
 
-        return array_filter($collection, fn ($resource) => $resource['type'] === $type);
+        foreach ($this->resources[$schemaName] ?? [] as $classPath => $resource) {
+            if ($resource['type'] === $type) {
+                $resources[$classPath] = $this->getResource($schemaName, $classPath);
+            }
+        }
+
+        return $resources;
+    }
+
+    /**
+     * Returns a resource with its operations (queries, mutations, subscriptions), reflecting its class on first use.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getResource(string $schemaName, string $classPath): ?array
+    {
+        $resource = $this->resources[$schemaName][$classPath] ?? null;
+
+        if ($resource === null || $resource['type'] !== 'class' || isset($resource['queries'])) {
+            return $resource;
+        }
+
+        /** @var class-string $classPath */
+        return $this->resources[$schemaName][$classPath] = $this->buildClassResource($classPath);
     }
 
     /**
@@ -227,6 +274,7 @@ class ResourceLoader
     {
         foreach ($this->resources[$schemaName] ?? [] as $classPath => $resource) {
             if ($resource['name'] === $className) {
+                $resource = $this->getResource($schemaName, $classPath) ?? $resource;
                 $resource['reflection'] = $this->getReflectionClass($schemaName, $classPath);
                 return $resource;
             }

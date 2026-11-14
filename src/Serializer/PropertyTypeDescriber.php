@@ -3,6 +3,7 @@
 namespace Jav\ApiTopiaBundle\Serializer;
 
 use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
+use Symfony\Component\PropertyInfo\PropertyInfoExtractorInterface;
 use Symfony\Component\PropertyInfo\Type as LegacyType;
 use Symfony\Component\TypeInfo\Type;
 use Symfony\Component\TypeInfo\Type\BuiltinType;
@@ -32,7 +33,7 @@ final class PropertyTypeDescriber
     /**
      * @return TypeDescription|null
      */
-    public static function describe(PropertyInfoExtractor $extractor, string $class, string $property): ?array
+    public static function describe(PropertyInfoExtractorInterface $extractor, string $class, string $property): ?array
     {
         if (self::supportsTypeInfo()) {
             $type = $extractor->getType($class, $property);

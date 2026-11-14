@@ -12,6 +12,8 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\SubscriptionResolverInterface;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Symfony\Component\HttpKernel\DependencyInjection\ConfigurableExtension;
 
@@ -63,6 +65,13 @@ class ApiTopiaExtension extends ConfigurableExtension
                 'max_query_depth' => $mergedConfig['max_query_depth'],
                 'max_query_complexity' => $mergedConfig['max_query_complexity'],
             ]);
+
+        // Like Symfony's property_info service: cached outside debug mode only, so DTO changes are seen in development
+        if (!$container->getParameter('kernel.debug')) {
+            $container
+                ->getDefinition('jav_apitopia.serializer.serializer')
+                ->setArgument(1, new Reference('cache.system', ContainerInterface::NULL_ON_INVALID_REFERENCE));
+        }
 
         $container
             ->getDefinition('jav_apitopia.graphql.resolver_provider')

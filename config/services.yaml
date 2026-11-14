@@ -68,7 +68,7 @@ services:
 
     jav_apitopia.cache.resources_warmer:
         class: Jav\ApiTopiaBundle\Cache\ResourcesWarmer
-        arguments: [ '@jav_apitopia.graphql.resource_loader' ]
+        arguments: [ '@jav_apitopia.graphql.resource_loader', '@jav_apitopia.graphql.schema_builder' ]
         tags:
             - { name: kernel.cache_warmer }
 

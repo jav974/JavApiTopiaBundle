@@ -25,10 +25,10 @@ class ReflectionUtils
      */
     public function extractFieldsInfoFromReflectionClass(ReflectionClass $reflectionClass): array
     {
-        $properties = $this->serializer->getPropertyInfoExtractor()->getProperties($reflectionClass->getName());
+        $properties = $this->serializer->getCachedPropertyInfoExtractor()->getProperties($reflectionClass->getName());
         $properties = array_fill_keys($properties ?? [], null);
         $metadata = $this->resourceLoader->getClassMetatadaFactory()->getMetadataFor($reflectionClass->getName())->getAttributesMetadata();
-        $propertyInfoExtractor = $this->serializer->getPropertyInfoExtractor();
+        $propertyInfoExtractor = $this->serializer->getCachedPropertyInfoExtractor();
 
         foreach ($properties as $name => &$info) {
             $description = PropertyTypeDescriber::describe($propertyInfoExtractor, $reflectionClass->getName(), $name);

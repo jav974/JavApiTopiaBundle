@@ -34,6 +34,7 @@ class JavApiTopiaTestKernel extends BaseKernel
      * Environments:
      * - "test": default bundle configuration (backward compatible behaviour)
      * - "test_legacy": type names of versions < 1.1
+     * - "test_lazy": default configuration, without debug (cached schema index and property information)
      * - "test_strict": hardened configuration (no debug, spec status codes, limits, no introspection nor GraphiQL)
      */
     public function __construct(string $environment = 'test', bool $debug = true)
