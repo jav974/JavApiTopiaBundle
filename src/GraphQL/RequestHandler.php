@@ -67,7 +67,7 @@ class RequestHandler
             };
 
             if ($psrRequest instanceof ResponseInterface) {
-                // The upload middleware rejected the request (e.g. payload too large)
+                // The request was rejected before GraphQL execution (e.g. payload too large)
                 return new JsonResponse((string) $psrRequest->getBody(), $psrRequest->getStatusCode(), [], true);
             }
 
@@ -213,6 +213,17 @@ class RequestHandler
 
     private function handleMultipartFormData(ServerRequestInterface $request): ServerRequestInterface|ResponseInterface
     {
+        // PHP drops the body of requests larger than post_max_size: report it clearly (whatever the graphql-upload version)
+        $contentLength = (int) ($request->getServerParams()['CONTENT_LENGTH'] ?? 0);
+        $postMaxSize = self::toBytes((string) ini_get('post_max_size'));
+
+        if ($postMaxSize > 0 && $contentLength > $postMaxSize) {
+            return new \Nyholm\Psr7\Response(413, ['Content-Type' => 'application/json'], json_encode(['errors' => [[
+                'message' => sprintf('The request body is larger than the server limit (post_max_size: %s).', ini_get('post_max_size')),
+                'extensions' => ['code' => ErrorCode::BAD_USER_INPUT],
+            ]]], JSON_THROW_ON_ERROR));
+        }
+
         $handler = new class () implements RequestHandlerInterface {
             public ?ServerRequestInterface $request = null;
 
@@ -235,5 +246,21 @@ class RequestHandler
     private function handleApplicationJson(ServerRequestInterface $request): ServerRequestInterface
     {
         return $request->withParsedBody($this->decodeJson((string) $request->getBody()));
+    }
+
+    /**
+     * Converts a php.ini size ("8M", "1G", "512K", "1024") to bytes.
+     */
+    private static function toBytes(string $size): int
+    {
+        $size = trim($size);
+        $value = (int) $size;
+
+        return match (strtoupper(substr($size, -1))) {
+            'G' => $value * 1024 ** 3,
+            'M' => $value * 1024 ** 2,
+            'K' => $value * 1024,
+            default => $value,
+        };
     }
 }
