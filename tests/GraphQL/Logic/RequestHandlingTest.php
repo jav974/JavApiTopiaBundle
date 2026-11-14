@@ -84,4 +84,35 @@ class RequestHandlingTest extends AbstractApiTestCase
         $this->assertSame(80, $collection['totalCount']);
         $this->assertCount(50, $collection['edges']);
     }
+
+    public function testApplicationGraphqlOperationNameFromQueryString(): void
+    {
+        $this->kernelBrowser->request(
+            'POST',
+            '/test/graphql/test1?operationName=Second',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/graphql'],
+            'query First { users { _id } } query Second { user(id: 3) { _id } }'
+        );
+        $response = json_decode($this->kernelBrowser->getResponse()->getContent(), true);
+
+        $this->assertGraph($response, ['data' => ['user' => ['_id' => 3]]]);
+    }
+
+    public function testMalformedJsonReturnsAnError(): void
+    {
+        $this->kernelBrowser->request('POST', '/test/graphql/test1', [], [], ['CONTENT_TYPE' => 'application/json'], '{not json');
+
+        $this->assertSame(500, $this->kernelBrowser->getResponse()->getStatusCode());
+        $response = json_decode($this->kernelBrowser->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('errors', $response);
+    }
+
+    public function testNegativePageSizeIsRejected(): void
+    {
+        $response = $this->graphQL('/test/graphql/test2', '{ apiResourceObject(id: 1) { apiResourceSubObjectAsCursorBasedSubQueryCollection(first: -1) { totalCount } } }');
+
+        $this->assertSame('Pagination arguments "first", "last" and "limit" must be positive integers.', $response['errors'][0]['message']);
+    }
 }

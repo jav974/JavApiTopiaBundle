@@ -65,7 +65,8 @@ jobs:
                 uses: codecov/codecov-action@v5
                 with:
                     token: ${{ secrets.CODECOV_TOKEN }}
-                if: matrix.operating-system == 'ubuntu-latest' && matrix.php == '8.4' && matrix.symfony == '7.4.*'
+                # One upload per Symfony major: version-specific code paths (PropertyInfo legacy types / TypeInfo) are merged by Codecov
+                if: matrix.operating-system == 'ubuntu-latest' && matrix.php == '8.4' && matrix.dependencies == 'highest'
 
     static-analysis:
         runs-on: ubuntu-latest

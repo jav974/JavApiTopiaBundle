@@ -31,7 +31,7 @@ class TypeResolver
         private readonly ReflectionUtils $reflectionUtils,
         private readonly TypeRegistry $typeRegistry,
         private readonly FieldsBuilder $fieldsBuilder,
-        private ?NodeResolverInterface $nodeResolver = null
+        private readonly ?NodeResolverInterface $nodeResolver = null
     ) {
         $this->nodeDefinition = Relay::nodeDefinitions(
             function ($globalId) {
@@ -47,15 +47,10 @@ class TypeResolver
         $this->fieldsBuilder->setTypeResolver($this);
     }
 
-    public function setNodeResolver(?NodeResolverInterface $nodeResolver): void
-    {
-        $this->nodeResolver = $nodeResolver;
-    }
-
     /**
      * Finds the concrete GraphQL object type of a value returned by the node resolver.
      */
-    private function resolveNodeType(mixed $object, ResolveInfo $info): ?ObjectType
+    private function resolveNodeType(mixed $object, ResolveInfo $info): ObjectType
     {
         $typeName = null;
 
@@ -65,13 +60,17 @@ class TypeResolver
             $typeName = $object['__typename'];
         }
 
-        if ($typeName === null || !$info->schema->hasType($typeName)) {
-            return null;
+        $type = $typeName !== null && $info->schema->hasType($typeName) ? $info->schema->getType($typeName) : null;
+
+        if (!$type instanceof ObjectType) {
+            throw new RuntimeException(sprintf(
+                'Cannot resolve the GraphQL type of the node returned by %s: return an object whose short class name is a type of the schema, or an array with a "__typename" key (got %s).',
+                NodeResolverInterface::class,
+                $typeName !== null ? sprintf('type "%s"', $typeName) : get_debug_type($object)
+            ));
         }
 
-        $type = $info->schema->getType($typeName);
-
-        return $type instanceof ObjectType ? $type : null;
+        return $type;
     }
 
     /**

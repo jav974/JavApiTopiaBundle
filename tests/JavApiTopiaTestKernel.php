@@ -127,6 +127,7 @@ class JavApiTopiaTestKernel extends BaseKernel
                     'error_http_status_code' => 200,
                     'introspection' => false,
                     'max_query_depth' => 2,
+                    'max_query_complexity' => 50,
                     'pagination' => ['default_limit' => 2, 'max_limit' => 5],
                     'graphiql' => ['enabled' => false],
                 ];

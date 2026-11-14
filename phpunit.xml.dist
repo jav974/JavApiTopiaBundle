@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
-         bootstrap="vendor/autoload.php"
+         bootstrap="tests/bootstrap.php"
          colors="true"
          cacheDirectory=".phpunit.cache"
          failOnWarning="true"
@@ -15,8 +15,6 @@
   </source>
   <php>
     <ini name="error_reporting" value="-1"/>
-    <ini name="intl.default_locale" value="en"/>
-    <ini name="intl.error_level" value="0"/>
     <ini name="memory_limit" value="-1"/>
     <server name="KERNEL_CLASS" value="Jav\ApiTopiaBundle\Tests\JavApiTopiaTestKernel"/>
     <server name="APP_ENV" value="test" force="true"/>

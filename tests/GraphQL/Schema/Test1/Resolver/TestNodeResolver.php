@@ -13,6 +13,15 @@ class TestNodeResolver implements NodeResolverInterface
             return null;
         }
 
+        // Array nodes must expose their GraphQL type name
+        if (str_starts_with($id, 'array-')) {
+            return ['__typename' => 'User', 'id' => (int) substr($id, 6), 'email' => "array$id@test.com"];
+        }
+
+        if ($id === 'untyped') {
+            return ['id' => 1];
+        }
+
         $user = new User();
         $user->id = (int) $id;
         $user->email = "node$id@test.com";

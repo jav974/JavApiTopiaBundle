@@ -30,12 +30,15 @@
 - The resource cache is refreshed automatically in debug mode when a resource directory changes.
 - Resource discovery uses the PHP tokenizer instead of regular expressions, and two classes producing the same GraphQL type name in a schema now raise an explicit error.
 - Sub queries on array parents no longer throw a `TypeError`.
+- The GraphQL `Client` now names multipart file parts (`file0`, ...): uploads through a real HTTP client were sent without field name.
+- A node that cannot be mapped to a GraphQL type raises an explicit error instead of falling back to a full schema scan.
 
 ### Added
 
 - Configuration options: `debug`, `error_http_status_code`, `batching`, `introspection`, `max_query_depth`, `max_query_complexity`, `pagination.default_limit`, `pagination.max_limit`, `graphiql.enabled`.
 - `$context['pagination']['fromEnd']` is `true` when only `last` is provided (the offset is then negative, counted from the end of the list).
 - `AbstractApiTestCase::$kernelOptions` and `AbstractApiTestCase::$kernelBrowser`.
+- `Client` accepts any `HttpClientInterface` (and default headers).
 
 ### Changed (behaviour)
 

@@ -130,4 +130,18 @@ class Schema1DeferredFixesTest extends AbstractApiTestCase
 
         $this->assertGraph($response, ['data' => ['node' => null]]);
     }
+
+    public function testRelayNodeFieldWithArrayNode(): void
+    {
+        $response = $this->graphQL('/test/graphql/test1', '{ node(id: "' . Relay::toGlobalId('test1.User', 'array-5') . '") { ... on User { _id email } } }');
+
+        $this->assertGraph($response, ['data' => ['node' => ['_id' => 5, 'email' => 'arrayarray-5@test.com']]]);
+    }
+
+    public function testRelayNodeFieldWithUntypedArrayFails(): void
+    {
+        $response = $this->graphQL('/test/graphql/test1', '{ node(id: "' . Relay::toGlobalId('test1.User', 'untyped') . '") { id } }');
+
+        $this->assertArrayHasKey('errors', $response);
+    }
 }

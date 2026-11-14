@@ -50,7 +50,7 @@ final class PropertyTypeDescriber
     /**
      * @return TypeDescription
      */
-    private static function describeLegacy(LegacyType $type): array
+    public static function describeLegacy(LegacyType $type): array
     {
         $innerType = !$type->isCollection() ? $type : ($type->getCollectionValueTypes()[0] ?? null);
 
@@ -65,7 +65,7 @@ final class PropertyTypeDescriber
     /**
      * @return TypeDescription
      */
-    private static function describeTypeInfo(Type $type): array
+    public static function describeTypeInfo(Type $type): array
     {
         $nullable = $type->isNullable();
         $type = self::unwrap($type);

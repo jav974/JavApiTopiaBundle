@@ -55,4 +55,14 @@ class DeferredResultsTest extends TestCase
         $this->assertFalse(isset($results[$a]));
         $this->assertFalse(isset($results['not an object']));
     }
+
+    public function testUnknownParentAndInvalidKey(): void
+    {
+        $results = new DeferredResults();
+
+        $this->assertNull($results[new \stdClass()]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $results['not an object'] = null;
+    }
 }

@@ -67,4 +67,13 @@ class StrictConfigurationTest extends AbstractApiTestCase
 
         $this->assertSame(404, $this->kernelBrowser->getResponse()->getStatusCode());
     }
+
+    public function testQueryComplexityIsLimited(): void
+    {
+        $fields = implode(' ', array_map(fn (int $i) => "u$i: users { _id }", range(1, 30)));
+        $response = $this->graphQL('/test/graphql/test1', "{ $fields }");
+
+        $this->assertArrayHasKey('errors', $response);
+        $this->assertStringContainsString('complexity', strtolower($response['errors'][0]['message']));
+    }
 }
