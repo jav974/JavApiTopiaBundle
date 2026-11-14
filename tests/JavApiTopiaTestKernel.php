@@ -3,6 +3,9 @@
 namespace Jav\ApiTopiaBundle\Tests;
 
 use Jav\ApiTopiaBundle\JavApiTopiaBundle;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Exception\OrderNotFoundException;
+use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Exception\PaymentGatewayException;
+use Jav\ApiTopiaBundle\Tests\Logger\TestLogger;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\DeferredCompanyResolver;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\DeferredOrdersResolver;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\FailingResolver;
@@ -76,6 +79,7 @@ class JavApiTopiaTestKernel extends BaseKernel
                 'test' => true,
                 'http_method_override' => false,
                 'handle_all_throwables' => true,
+                'validation' => ['enabled' => true],
                 'php_errors' => [
                     'log' => true
                 ],
@@ -141,7 +145,14 @@ class JavApiTopiaTestKernel extends BaseKernel
                 ];
             }
 
+            $apiTopiaConfig['error_mapping'] = [
+                OrderNotFoundException::class => 'NOT_FOUND',
+                PaymentGatewayException::class => ['code' => 'PAYMENT_FAILED', 'expose_message' => false],
+            ];
+
             $container->loadFromExtension('api_topia', $apiTopiaConfig);
+            // Keeps logs in memory, so that tests can check them (and nothing is written to stderr)
+            $container->register('logger', TestLogger::class)->setPublic(true);
             $container->loadFromExtension('twig', []);
 
             $container->register(FailingResolver::class)->addTag('apitopia.graphql_resolver');

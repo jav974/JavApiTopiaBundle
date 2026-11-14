@@ -104,9 +104,11 @@ class RequestHandlingTest extends AbstractApiTestCase
     {
         $this->kernelBrowser->request('POST', '/test/graphql/test1', [], [], ['CONTENT_TYPE' => 'application/json'], '{not json');
 
-        $this->assertSame(500, $this->kernelBrowser->getResponse()->getStatusCode());
+        // The request is invalid: client error
+        $this->assertSame(400, $this->kernelBrowser->getResponse()->getStatusCode());
         $response = json_decode($this->kernelBrowser->getResponse()->getContent(), true);
-        $this->assertArrayHasKey('errors', $response);
+        $this->assertSame('BAD_USER_INPUT', $response['errors'][0]['extensions']['code']);
+        $this->assertStringStartsWith('Invalid JSON', $response['errors'][0]['message']);
     }
 
     public function testNegativePageSizeIsRejected(): void
@@ -121,5 +123,24 @@ class RequestHandlingTest extends AbstractApiTestCase
         $response = $this->graphQL('/test/graphql/test1', '{ __type(name: "DoesNotExist") { name } }');
 
         $this->assertSame(['data' => ['__type' => null]], $response);
+    }
+
+    public function testGetRequest(): void
+    {
+        $this->kernelBrowser->request('GET', '/test/graphql/test1?query=' . rawurlencode('{ users { _id } }'), [], [], ['CONTENT_TYPE' => '']);
+        $response = json_decode($this->kernelBrowser->getResponse()->getContent(), true);
+
+        $this->assertSame(['data' => ['users' => [['_id' => 1], ['_id' => 2]]]], $response);
+    }
+
+    public function testUploadLargerThanPostMaxSize(): void
+    {
+        $this->kernelBrowser->request('POST', '/test/graphql/test1', ['operations' => '{}', 'map' => '{}'], [], [
+            'CONTENT_TYPE' => 'multipart/form-data',
+            'CONTENT_LENGTH' => PHP_INT_MAX,
+        ]);
+
+        $this->assertSame(413, $this->kernelBrowser->getResponse()->getStatusCode());
+        $this->assertStringContainsString('post_max_size', $this->kernelBrowser->getResponse()->getContent());
     }
 }

@@ -16,6 +16,7 @@ use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQueryCollection;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Subscription;
 use Jav\ApiTopiaBundle\Api\GraphQL\DeferredResults;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\DeferredResolverInterface;
+use Jav\ApiTopiaBundle\Error\ValidationException;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\MutationResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryCollectionResolverInterface;
 use Jav\ApiTopiaBundle\Api\GraphQL\Resolver\QueryItemResolverInterface;
@@ -23,11 +24,14 @@ use Jav\ApiTopiaBundle\Pagination\PaginatorInterface;
 use Jav\ApiTopiaBundle\Serializer\Serializer;
 use RuntimeException;
 use Symfony\Component\DependencyInjection\ServiceLocator;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class ResolverProvider
 {
     /** @var array<string, DeferredResults> Deferred results, indexed by field (parent type, field name and arguments) */
     private array $deferredBuffer = [];
+
+    private ?ValidatorInterface $validator = null;
 
     private int $defaultLimit = 50;
     private int $maxLimit = 0;
@@ -49,6 +53,14 @@ class ResolverProvider
     {
         $this->defaultLimit = max(1, (int) ($options['default_limit'] ?? $this->defaultLimit));
         $this->maxLimit = max(0, (int) ($options['max_limit'] ?? $this->maxLimit));
+    }
+
+    /**
+     * Enables the validation of deserialized mutation inputs.
+     */
+    public function setValidator(?ValidatorInterface $validator): void
+    {
+        $this->validator = $validator;
     }
 
     /**
@@ -99,6 +111,7 @@ class ResolverProvider
 
                 if ($attribute->deserialize && $attribute->input) {
                     $input = $this->serializer->denormalize($input, $attribute->input);
+                    $this->validate($attribute, $input);
                 } else {
                     // Transforms Psr7 UploadedFile to Symfony UploadedFile
                     $this->serializer->denormalizeInput($input);
@@ -287,6 +300,22 @@ class ResolverProvider
         }
 
         return $data instanceof \Traversable ? iterator_to_array($data, false) : [];
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function validate(Mutation $mutation, mixed $input): void
+    {
+        if ($this->validator === null || !$mutation->validate || !is_object($input)) {
+            return;
+        }
+
+        $violations = $this->validator->validate($input, null, $mutation->validationGroups);
+
+        if ($violations->count() > 0) {
+            throw new ValidationException($violations, 'input');
+        }
     }
 
     /**

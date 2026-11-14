@@ -3,12 +3,14 @@
 namespace Jav\ApiTopiaBundle\GraphQL;
 
 use GraphQL\Error\DebugFlag;
-use GraphQL\Error\FormattedError;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Server\ServerConfig;
 use GraphQL\Server\StandardServer;
 use GraphQL\Upload\UploadMiddleware;
 use GraphQL\Validator\DocumentValidator;
+use Jav\ApiTopiaBundle\Error\ClientException;
+use Jav\ApiTopiaBundle\Error\ErrorCode;
+use Jav\ApiTopiaBundle\Error\ErrorFormatter;
 use GraphQL\Validator\Rules\DisableIntrospection;
 use GraphQL\Validator\Rules\QueryComplexity;
 use GraphQL\Validator\Rules\QueryDepth;
@@ -24,6 +26,8 @@ use Symfony\Component\HttpFoundation\Request;
 
 class RequestHandler
 {
+    private readonly ErrorFormatter $errorFormatter;
+
     /**
      * @param array{debug?: bool|string, error_http_status_code?: int, batching?: bool, introspection?: bool, max_query_depth?: int, max_query_complexity?: int} $options
      */
@@ -31,7 +35,9 @@ class RequestHandler
         private readonly SchemaBuilder $schemaBuilder,
         private readonly ?ResolverProvider $resolverProvider = null,
         private array $options = [],
+        ?ErrorFormatter $errorFormatter = null,
     ) {
+        $this->errorFormatter = $errorFormatter ?? new ErrorFormatter();
         $this->options += [
             'debug' => false,
             'error_http_status_code' => 500,
@@ -61,7 +67,7 @@ class RequestHandler
             };
 
             if ($psrRequest instanceof ResponseInterface) {
-                // The upload middleware rejected the request (e.g. payload too large)
+                // The request was rejected before GraphQL execution (e.g. payload too large)
                 return new JsonResponse((string) $psrRequest->getBody(), $psrRequest->getStatusCode(), [], true);
             }
 
@@ -69,6 +75,7 @@ class RequestHandler
                 ->setSchema($this->schemaBuilder->getSchema($schemaName))
                 ->setQueryBatching((bool) $this->options['batching'])
                 ->setDebugFlag($debugFlag)
+                ->setErrorsHandler(fn (array $errors) => $this->errorFormatter->formatAll($errors, $debugFlag))
                 ->setValidationRules($this->getValidationRules())
             ;
 
@@ -87,10 +94,16 @@ class RequestHandler
 
             return new JsonResponse($jsonResult, $statusCode, [], true);
         } catch (\Throwable $e) {
-            return new JsonResponse([
-                'errors' => [
-                    FormattedError::createFromException($e, $debugFlag)
-                ]], 500);
+            $error = $this->errorFormatter->format($e, $debugFlag);
+
+            if ($error['extensions']['code'] === ErrorCode::INTERNAL_SERVER_ERROR) {
+                $this->errorFormatter->log($e);
+
+                return new JsonResponse(['errors' => [$error]], 500);
+            }
+
+            // The request itself is invalid (malformed JSON body...)
+            return new JsonResponse(['errors' => [$error]], 400);
         }
     }
 
@@ -150,7 +163,7 @@ class RequestHandler
         $variables = $queryParams['variables'] ?? null;
 
         if (is_string($variables) && $variables !== '') {
-            $variables = json_decode($variables, true, flags: JSON_THROW_ON_ERROR);
+            $variables = $this->decodeJson($variables);
         }
 
         $parsedBody = ['query' => $body];
@@ -186,8 +199,31 @@ class RequestHandler
     /**
      * Uses the PSR-15 API of the upload middleware, available in every supported version of ecodev/graphql-upload.
      */
+    /**
+     * @throws ClientException
+     */
+    private function decodeJson(string $json): mixed
+    {
+        try {
+            return json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new ClientException(sprintf('Invalid JSON: %s', $e->getMessage()), ErrorCode::BAD_USER_INPUT, [], $e);
+        }
+    }
+
     private function handleMultipartFormData(ServerRequestInterface $request): ServerRequestInterface|ResponseInterface
     {
+        // PHP drops the body of requests larger than post_max_size: report it clearly (whatever the graphql-upload version)
+        $contentLength = (int) ($request->getServerParams()['CONTENT_LENGTH'] ?? 0);
+        $postMaxSize = self::toBytes((string) ini_get('post_max_size'));
+
+        if ($postMaxSize > 0 && $contentLength > $postMaxSize) {
+            return new \Nyholm\Psr7\Response(413, ['Content-Type' => 'application/json'], json_encode(['errors' => [[
+                'message' => sprintf('The request body is larger than the server limit (post_max_size: %s).', ini_get('post_max_size')),
+                'extensions' => ['code' => ErrorCode::BAD_USER_INPUT],
+            ]]], JSON_THROW_ON_ERROR));
+        }
+
         $handler = new class () implements RequestHandlerInterface {
             public ?ServerRequestInterface $request = null;
 
@@ -209,6 +245,22 @@ class RequestHandler
      */
     private function handleApplicationJson(ServerRequestInterface $request): ServerRequestInterface
     {
-        return $request->withParsedBody(json_decode((string) $request->getBody(), true, flags: JSON_THROW_ON_ERROR));
+        return $request->withParsedBody($this->decodeJson((string) $request->getBody()));
+    }
+
+    /**
+     * Converts a php.ini size ("8M", "1G", "512K", "1024") to bytes.
+     */
+    private static function toBytes(string $size): int
+    {
+        $size = trim($size);
+        $value = (int) $size;
+
+        return match (strtoupper(substr($size, -1))) {
+            'G' => $value * 1024 ** 3,
+            'M' => $value * 1024 ** 2,
+            'K' => $value * 1024,
+            default => $value,
+        };
     }
 }

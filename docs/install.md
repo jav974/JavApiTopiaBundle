@@ -91,6 +91,10 @@ api_topia:
   # Expose exception messages and stack traces in GraphQL errors. Never enable this in production.
   debug: '%kernel.debug%'
 
+  # Exceptions exposed to clients with a code (see docs/errors.md)
+  error_mapping:
+    App\Domain\OrderNotFound: NOT_FOUND
+
   # HTTP status code of responses containing GraphQL errors.
   # 500 is the historical default; use 200 to follow the GraphQL-over-HTTP convention.
   error_http_status_code: 500

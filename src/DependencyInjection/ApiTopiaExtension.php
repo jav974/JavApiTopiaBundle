@@ -74,6 +74,10 @@ class ApiTopiaExtension extends ConfigurableExtension
         }
 
         $container
+            ->getDefinition('jav_apitopia.error.formatter')
+            ->setArgument(0, $mergedConfig['error_mapping']);
+
+        $container
             ->getDefinition('jav_apitopia.graphql.resolver_provider')
             ->addMethodCall('setPaginationOptions', [[
                 'default_limit' => $mergedConfig['pagination']['default_limit'],
