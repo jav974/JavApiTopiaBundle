@@ -4,6 +4,7 @@ namespace Jav\ApiTopiaBundle\GraphQL;
 
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQuery;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\SubQueryCollection;
+use Jav\ApiTopiaBundle\Serializer\PropertyTypeDescriber;
 use Jav\ApiTopiaBundle\Serializer\Serializer;
 use ReflectionClass;
 use ReflectionException;
@@ -30,10 +31,9 @@ class ReflectionUtils
         $propertyInfoExtractor = $this->serializer->getPropertyInfoExtractor();
 
         foreach ($properties as $name => &$info) {
-            $types = $propertyInfoExtractor->getTypes($reflectionClass->getName(), $name);
-            $type = $types[0] ?? null;
+            $description = PropertyTypeDescriber::describe($propertyInfoExtractor, $reflectionClass->getName(), $name);
 
-            if ($type === null) {
+            if ($description === null) {
                 continue;
             }
 
@@ -46,22 +46,22 @@ class ReflectionUtils
                 $isBuiltin = false;
             }
 
-            $collectionValueType = $type->getCollectionValueTypes()[0] ?? null;
-            $innerType = !$type->isCollection() ? $type : $collectionValueType;
-
             $info = [
                 'name' => $name,
-                'type' => $innerType?->getClassName() ?? $innerType?->getBuiltinType() ?? 'string',
-                'isCollection' => $type->isCollection(),
-                'allowsNull' => $type->isNullable(),
+                'type' => $description['className'] ?? $description['builtin'] ?? 'string',
+                'isCollection' => $description['isCollection'],
+                'allowsNull' => $description['nullable'],
                 'description' => $propertyInfoExtractor->getLongDescription($reflectionClass->getName(), $name)
                     ?? $propertyInfoExtractor->getShortDescription($reflectionClass->getName(), $name) ?? null,
                 'isBuiltin' => $isBuiltin,
                 'attribute' => $attribute?->newInstance(),
                 'metadata' => $metadata[$name] ?? null,
-                'isEnum' => enum_exists($innerType?->getClassName() ?? ''),
+                'isEnum' => enum_exists($description['className'] ?? ''),
             ];
         }
+
+        // Properties without any type information are not exposed
+        $properties = array_filter($properties, fn ($info) => $info !== null);
 
         return $properties;
     }

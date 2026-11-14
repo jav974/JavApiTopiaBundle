@@ -6,6 +6,9 @@ use ArrayIterator;
 use IteratorAggregate;
 use Traversable;
 
+/**
+ * @implements IteratorAggregate<int, mixed>
+ */
 class VirtualArrayPaginator implements IteratorAggregate, PaginatorInterface
 {
     /**

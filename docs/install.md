@@ -8,13 +8,12 @@ of the Composer documentation.
 Prerequisites
 -------------
 
-```json
-// composer.json
-{
-  "require": {
-    "ivome/graphql-relay-php": "@dev"
-  }
-}
+- PHP 8.1 or higher
+- Symfony 6.4, 7.x or 8.x (Symfony 8 requires PHP 8.4)
+- `symfony/mercure-bundle` if you use subscriptions:
+
+```console
+$ composer require symfony/mercure-bundle
 ```
 
 Applications that use Symfony Flex
@@ -79,3 +78,79 @@ api_topia:
 ```
 *Make sure that **resource_directories** exist*
 
+
+Full configuration reference
+----------------------------
+
+```yaml
+#config/packages/apitopia.yaml
+
+api_topia:
+  schema_output_dir: '%kernel.project_dir%'
+
+  # Expose exception messages and stack traces in GraphQL errors. Never enable this in production.
+  debug: '%kernel.debug%'
+
+  # HTTP status code of responses containing GraphQL errors.
+  # 500 is the historical default; use 200 to follow the GraphQL-over-HTTP convention.
+  error_http_status_code: 500
+
+  # Allow several operations in a single HTTP request (JSON array payload)
+  batching: true
+
+  # Allow introspection queries (__schema, __type)
+  introspection: true
+
+  # Maximum depth of a query (0 disables the check)
+  max_query_depth: 15
+
+  # Maximum complexity of a query (0 disables the check)
+  max_query_complexity: 0
+
+  pagination:
+    # Page size used when the client does not provide "first", "last" or "limit"
+    default_limit: 50
+    # Maximum page size a client may request (0 disables the cap)
+    max_limit: 1000
+
+  graphiql:
+    # Expose the GraphiQL IDE on /api/graphiql/{schema}
+    enabled: '%kernel.debug%'
+
+  schemas:
+    default_schema:
+      path: '/graphql'
+      resource_directories: ['%kernel.project_dir%/src/Api']
+```
+
+### Recommended production settings
+
+```yaml
+#config/packages/prod/apitopia.yaml
+
+api_topia:
+  error_http_status_code: 200
+  introspection: false
+  max_query_complexity: 500
+```
+
+Relay `node` field
+------------------
+
+To make the Relay `node(id: ID!)` field work, implement `Jav\ApiTopiaBundle\GraphQL\NodeResolverInterface`
+in a service (autoconfiguration registers it automatically).
+`$type` is `<schema name>.<GraphQL type name>` (e.g. `default_schema.User`) and `$id` is the raw identifier.
+Return the object (its short class name must match a GraphQL type of the schema) or `null`.
+
+```php
+final class NodeResolver implements NodeResolverInterface
+{
+    public function resolve(string $type, string $id): mixed
+    {
+        return match ($type) {
+            'default_schema.User' => $this->users->find($id),
+            default => null,
+        };
+    }
+}
+```

@@ -13,6 +13,13 @@ class RouteLoader extends Loader
     /** @var string[] */
     private array $graphQLEndpoints = [];
 
+    private bool $graphiQLEnabled = true;
+
+    public function setGraphiQLEnabled(bool|string|null $enabled): void
+    {
+        $this->graphiQLEnabled = filter_var($enabled, FILTER_VALIDATE_BOOLEAN);
+    }
+
     /**
      * @param string[] $endpoints
      */
@@ -21,7 +28,7 @@ class RouteLoader extends Loader
         $this->graphQLEndpoints = $endpoints;
     }
 
-    public function load(mixed $resource, string $type = null): RouteCollection
+    public function load(mixed $resource, ?string $type = null): RouteCollection
     {
         if ($this->isLoaded) {
             throw new \RuntimeException('Do not add the "apitopia" loader twice');
@@ -30,7 +37,11 @@ class RouteLoader extends Loader
         $routes = new RouteCollection();
 
         $this->loadGraphQLEndpoints($routes);
-        $this->loadGraphiQLEndpoint($routes);
+
+        if ($this->graphiQLEnabled) {
+            $this->loadGraphiQLEndpoint($routes);
+        }
+
         $this->isLoaded = true;
 
         return $routes;
@@ -56,7 +67,7 @@ class RouteLoader extends Loader
         ], methods: ['GET', 'POST']));
     }
 
-    public function supports($resource, string $type = null): bool
+    public function supports($resource, ?string $type = null): bool
     {
         return $type === 'apitopia';
     }

@@ -20,7 +20,10 @@ class Client
 
     protected CurlHttpClient|KernelBrowser $client;
 
-    public function __construct(?KernelBrowser $client = null)
+    /**
+     * @param array<string, string> $defaultHeaders Headers sent with every request (e.g. ['Cookie' => 'XDEBUG_SESSION=PHPSTORM'] to debug)
+     */
+    public function __construct(?KernelBrowser $client = null, private readonly array $defaultHeaders = [])
     {
         if ($client !== null) {
             $this->client = $client;
@@ -71,8 +74,8 @@ class Client
             $query['operations']['variables'] = $variables;
         }
 
-        $query['operations'] = json_encode($query['operations']);
-        $query['map'] = json_encode($query['map']);
+        $query['operations'] = json_encode($query['operations'], JSON_THROW_ON_ERROR);
+        $query['map'] = json_encode($query['map'], JSON_THROW_ON_ERROR);
 
         if ($this->client instanceof KernelBrowser) {
             $this->client->request(
@@ -96,7 +99,7 @@ class Client
             'POST',
             $endpoint,
             [
-                'headers' => $formData->getPreparedHeaders()->toArray() + ['Cookie' => 'XDEBUG_SESSION=eclipse'],
+                'headers' => $formData->getPreparedHeaders()->toArray() + $this->defaultHeaders,
                 'body' => $formData->bodyToString()
             ]
         );
@@ -109,17 +112,19 @@ class Client
     {
         if (!empty($variables)) {
             $endpoint .= !str_contains($endpoint, '?') ? '?' : '&';
-            $endpoint .= http_build_query(['variables' => $variables]);
+            $endpoint .= http_build_query(['variables' => json_encode($variables, JSON_THROW_ON_ERROR)]);
+        }
+
+        if ($this->client instanceof KernelBrowser) {
+            $this->client->request('POST', $endpoint, [], [], ['CONTENT_TYPE' => self::CONTENT_TYPE_GRAPHQL], $gql);
+            return $this->client->getResponse();
         }
 
         return $this->client->request(
             'POST',
             $endpoint,
             [
-                'headers' => [
-                    'Content-Type' => self::CONTENT_TYPE_GRAPHQL,
-                    'Cookie' => 'XDEBUG_SESSION=eclipse'
-                ],
+                'headers' => ['Content-Type' => self::CONTENT_TYPE_GRAPHQL] + $this->defaultHeaders,
                 'body' => $gql
             ]
         );
@@ -145,11 +150,8 @@ class Client
             'POST',
             $endpoint,
             [
-                'headers' => [
-                    'Content-Type' => self::CONTENT_TYPE_JSON,
-                    'Cookie' => 'XDEBUG_SESSION=eclipse'
-                ],
-                'body' => json_encode($body)
+                'headers' => ['Content-Type' => self::CONTENT_TYPE_JSON] + $this->defaultHeaders,
+                'body' => json_encode($body, JSON_THROW_ON_ERROR)
             ]
         );
     }

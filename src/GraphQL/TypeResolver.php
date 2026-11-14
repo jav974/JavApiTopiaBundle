@@ -9,6 +9,7 @@ use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\PhpEnumType;
+use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Type\Definition\Type;
 use GraphQLRelay\Relay;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
@@ -30,7 +31,7 @@ class TypeResolver
         private readonly ReflectionUtils $reflectionUtils,
         private readonly TypeRegistry $typeRegistry,
         private readonly FieldsBuilder $fieldsBuilder,
-        private readonly ?NodeResolverInterface $nodeResolver = null
+        private ?NodeResolverInterface $nodeResolver = null
     ) {
         $this->nodeDefinition = Relay::nodeDefinitions(
             function ($globalId) {
@@ -38,12 +39,39 @@ class TypeResolver
 
                 return $this->nodeResolver?->resolve($idComponents['type'], $idComponents['id']);
             },
-            function ($object) {
-                return null;
+            function ($object, $context, ResolveInfo $info) {
+                return $this->resolveNodeType($object, $info);
             }
         );
         $this->typeRegistry->register('Node', $this->nodeDefinition['nodeInterface']);
         $this->fieldsBuilder->setTypeResolver($this);
+    }
+
+    public function setNodeResolver(?NodeResolverInterface $nodeResolver): void
+    {
+        $this->nodeResolver = $nodeResolver;
+    }
+
+    /**
+     * Finds the concrete GraphQL object type of a value returned by the node resolver.
+     */
+    private function resolveNodeType(mixed $object, ResolveInfo $info): ?ObjectType
+    {
+        $typeName = null;
+
+        if (is_object($object)) {
+            $typeName = (new ReflectionClass($object))->getShortName();
+        } elseif (is_array($object) && isset($object['__typename']) && is_string($object['__typename'])) {
+            $typeName = $object['__typename'];
+        }
+
+        if ($typeName === null || !$info->schema->hasType($typeName)) {
+            return null;
+        }
+
+        $type = $info->schema->getType($typeName);
+
+        return $type instanceof ObjectType ? $type : null;
     }
 
     /**
@@ -122,7 +150,7 @@ class TypeResolver
         $isNodeInterface = (bool)($attribute);
         $objectTypeData = [
             'name' => $reflectionClass->getShortName(),
-            'description' => $attribute?->description ?? ReflectionUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null),
+            'description' => $attribute->description ?? ReflectionUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null),
             'fields' => function () use ($reflectionClass, $schemaName, $isNodeInterface) {
                 $properties = $this->reflectionUtils->extractFieldsInfoFromReflectionClass($reflectionClass);
                 $fields = [];
@@ -218,6 +246,9 @@ class TypeResolver
         return $type;
     }
 
+    /**
+     * @param ReflectionClass<object>|\ReflectionEnum<\UnitEnum> $reflectionEnum
+     */
     private function createEnumType(string $schemaName, \ReflectionClass|\ReflectionEnum $reflectionEnum): Type&NullableType
     {
         $type = new PhpEnumType($reflectionEnum->getName());

@@ -1,0 +1,8 @@
+/vendor/
+/composer.lock
+/.phpunit.cache/
+/.phpunit.result.cache
+/coverage.xml
+/tests/GraphQL/Output/*
+!/tests/GraphQL/Output/.gitignore
+/config/reference.php
