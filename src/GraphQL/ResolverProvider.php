@@ -6,8 +6,8 @@ use Closure;
 use GraphQL\Deferred;
 use GraphQL\Error\UserError;
 use GraphQL\Type\Definition\ResolveInfo;
-use GraphQLRelay\Connection\ArrayConnection;
-use GraphQLRelay\Relay;
+use Jav\ApiTopiaBundle\GraphQL\Relay\ConnectionArguments;
+use Jav\ApiTopiaBundle\GraphQL\Relay\ConnectionBuilder;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Mutation;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
@@ -129,7 +129,8 @@ class ResolverProvider
             $isDeferred = ($attribute instanceof SubQuery || $attribute instanceof SubQueryCollection) && $attribute->deferred;
             $isDeferred = $isDeferred === true;
             $context = $context ?? [];
-            $context += $this->getQueryContext($resolveInfo, $schemaName, $root, $args, $isPaginatedCollection);
+            $isCursorPagination = $isPaginatedCollection && $attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR;
+            $context += $this->getQueryContext($resolveInfo, $schemaName, $root, $args, $isPaginatedCollection, $isCursorPagination);
 
             if ($isDeferred) {
                 if (!is_object($root)) {
@@ -171,7 +172,12 @@ class ResolverProvider
 
             if ($isPaginatedCollection) {
                 /** @var QueryCollection $attribute */
-                $data = $this->handlePaginatedCollection($attribute, $data, $args, $context);
+                $data = $this->handlePaginatedCollection($attribute, $data, $args, $context, function (array $window) use ($attribute, $context) {
+                    // The requested page did not match the list (e.g. a cursor of a removed item): load the right one
+                    $context['pagination'] = $window + ['fromEnd' => false];
+
+                    return $this->execResolver($attribute, $context);
+                });
             }
 
             return $data;
@@ -182,7 +188,7 @@ class ResolverProvider
      * @param array<string, mixed> $args
      * @return array<string, mixed>
      */
-    private function getQueryContext(ResolveInfo $resolveInfo, string $schemaName, mixed $root, array $args, bool $isPaginatedCollection): array
+    private function getQueryContext(ResolveInfo $resolveInfo, string $schemaName, mixed $root, array $args, bool $isPaginatedCollection, bool $isCursorPagination = false): array
     {
         $context = [
             'info' => $resolveInfo,
@@ -204,9 +210,9 @@ class ResolverProvider
         }
 
         if ($isPaginatedCollection) {
-            $offset = 0;
-            $limit = 0;
-            $this->toLimits($args, $offset, $limit);
+            ['offset' => $offset, 'limit' => $limit] = $isCursorPagination
+                ? $this->getConnectionArguments($args)->window()
+                : $this->getOffsetWindow($args);
 
             $context['pagination'] = [
                 'offset' => $offset,
@@ -223,45 +229,64 @@ class ResolverProvider
      * @param iterable<mixed>|PaginatorInterface|null $data
      * @param array<string, mixed> $args
      * @param array<string, mixed> $context
+     * @param (callable(array{offset: int, limit: int}): mixed)|null $reload Loads another page of the list
      * @return array<string, mixed>
      */
-    private function handlePaginatedCollection(QueryCollection $attribute, iterable|PaginatorInterface|null $data, array $args, array $context): array
+    private function handlePaginatedCollection(QueryCollection $attribute, iterable|PaginatorInterface|null $data, array $args, array $context, ?callable $reload = null): array
     {
-        $connectionData = [];
+        $data = $this->normalizeCollection($data);
 
-        if ($data === null) {
-            $data = [];
-        } elseif ($data instanceof \Traversable && !$data instanceof PaginatorInterface) {
-            $data = iterator_to_array($data, false);
+        if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
+            return [
+                'items' => is_array($data)
+                    ? array_slice($data, $context['pagination']['offset'], $context['pagination']['limit'])
+                    : $data->getCurrentPageResults(),
+                'totalCount' => is_array($data) ? count($data) : $data->getTotalItems(),
+            ];
         }
 
+        $connectionArguments = $this->getConnectionArguments($args);
+        $connection = $this->buildConnection($data, $connectionArguments);
+
+        if ($connection === null && $reload !== null) {
+            $connection = $this->buildConnection(
+                $this->normalizeCollection($reload(ConnectionBuilder::requiredWindow($data instanceof PaginatorInterface ? $data->getTotalItems() : count($data), $connectionArguments))),
+                $connectionArguments
+            );
+        }
+
+        return $connection ?? throw new RuntimeException(sprintf(
+            'The paginator returned by resolver "%s" does not contain the requested page: use $context[\'pagination\'] to load it.',
+            $attribute->resolver
+        ));
+    }
+
+    /**
+     * @param array<mixed>|PaginatorInterface $data
+     * @return array<string, mixed>|null null when a paginator does not contain the requested page
+     */
+    private function buildConnection(array|PaginatorInterface $data, ConnectionArguments $arguments): ?array
+    {
         if (is_array($data)) {
-            if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
-                // Apply the default page size when the client does not ask for one, like the offset pagination does
-                if (!isset($args['first']) && !isset($args['last'])) {
-                    $args['first'] = $context['pagination']['limit'];
-                }
-
-                $connectionData = Relay::connectionFromArray($data, $args);
-            } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
-                $connectionData = ['items' => array_slice($data, $context['pagination']['offset'], $context['pagination']['limit'])];
-            }
-
-            $connectionData['totalCount'] = count($data);
-        } elseif ($data instanceof PaginatorInterface) {
-            if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
-                $connectionData = Relay::connectionFromArraySlice($data->getCurrentPageResults(), $args, [
-                    'sliceStart' => $data->getCurrentPageOffset(),
-                    'arrayLength' => $data->getTotalItems()
-                ]);
-            } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
-                $connectionData = ['items' => $data->getCurrentPageResults()];
-            }
-
-            $connectionData['totalCount'] = $data->getTotalItems();
+            return ConnectionBuilder::fromArray($data, $arguments) + ['totalCount' => count($data)];
         }
 
-        return $connectionData;
+        $connection = ConnectionBuilder::fromSlice($data->getCurrentPageResults(), $data->getCurrentPageOffset(), $data->getTotalItems(), $arguments);
+
+        return $connection === null ? null : $connection + ['totalCount' => $data->getTotalItems()];
+    }
+
+    /**
+     * @param iterable<mixed>|PaginatorInterface|null $data
+     * @return array<mixed>|PaginatorInterface
+     */
+    private function normalizeCollection(mixed $data): array|PaginatorInterface
+    {
+        if ($data instanceof PaginatorInterface || is_array($data)) {
+            return $data;
+        }
+
+        return $data instanceof \Traversable ? iterator_to_array($data, false) : [];
     }
 
     /**
@@ -284,37 +309,32 @@ class ResolverProvider
     }
 
     /**
-     * Finds the firstResult and maxResults from context query
-     * This method can handle cursor based pagination (first, before, last, after)
-     * If we'd like to change this navigation to something else, this is the only location where we would operate on the new args
-     * No matter what, in the end we just need $firstResult (offset) and $maxResults (limit)
-     *
-     * @param array<string, mixed> $filters
+     * @param array<string, mixed> $args
+     * @throws UserError
      */
-    private function toLimits(array $filters, int &$firstResult = 0, int &$maxResults = 0): void
+    private function getConnectionArguments(array $args): ConnectionArguments
     {
-        $maxResults = (int) ($filters['first'] ?? $filters['last'] ?? $filters['limit'] ?? $this->defaultLimit);
+        return ConnectionArguments::fromArgs($args, $this->defaultLimit, $this->maxLimit);
+    }
 
-        if ($maxResults < 0) {
-            throw new UserError('Pagination arguments "first", "last" and "limit" must be positive integers.');
+    /**
+     * @param array<string, mixed> $args
+     * @return array{offset: int, limit: int}
+     * @throws UserError
+     */
+    private function getOffsetWindow(array $args): array
+    {
+        $limit = (int) ($args['limit'] ?? $this->defaultLimit);
+
+        if ($limit < 0 || (int) ($args['offset'] ?? 0) < 0) {
+            throw new UserError('Arguments "offset" and "limit" must be non-negative integers.');
         }
 
-        if ($this->maxLimit > 0 && $maxResults > $this->maxLimit) {
+        if ($this->maxLimit > 0 && $limit > $this->maxLimit) {
             throw new UserError(sprintf('Cannot request more than %d items per page.', $this->maxLimit));
         }
 
-        $firstResult = max(0, (int) ($filters['offset'] ?? 0));
-
-        // 'before' and 'after' are integers corresponding to the position of the element in the array
-        // They are base64 encoded integer, so we have to decode them in order to compute something
-
-        if (isset($filters['last']) && isset($filters['before'])) {
-            $firstResult = max((int) ArrayConnection::cursorToOffset($filters['before']) - $maxResults, 0);
-        } elseif (isset($filters['first']) && isset($filters['after'])) {
-            $firstResult = (int) ArrayConnection::cursorToOffset($filters['after']) + 1;
-        } elseif (isset($filters['last'])) {
-            $firstResult = -$maxResults;
-        }
+        return ['offset' => (int) ($args['offset'] ?? 0), 'limit' => $limit];
     }
 
     /**

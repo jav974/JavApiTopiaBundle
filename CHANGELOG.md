@@ -10,6 +10,18 @@
 - `ecodev/graphql-upload` 8 is supported.
 - `symfony/mercure-bundle` is now optional (only required for subscriptions).
 
+### Relay
+
+- Relay is implemented internally: `ivome/graphql-relay-php` (unmaintained since 2023, deprecations on PHP 8.4+) is no longer required. Global IDs and cursors keep the same format, so values already handed to clients keep working. See [docs/relay.md](docs/relay.md).
+- Full compliance with the Cursor Connections specification: cursors that do not match an edge are ignored, `hasPreviousPage` is `true` after an `after` cursor and `hasNextPage` is `true` before a `before` cursor (both were always `false`), negative `first`/`last` are rejected.
+- `node(id:)` refetches objects automatically with the item query of their type taking an `id` argument; `NodeResolverInterface` remains available for custom logic.
+- New plural identifying root field `nodes(ids: [ID!]!): [Node]!` (not added when the application already defines a `nodes` query).
+- Reserved type names (`PageInfo`, `*Connection`) are checked in debug mode and by `apitopia:build-schema`.
+- **Offset paginated types are renamed from `<Type>OffsetConnection` to `<Type>OffsetPage`**, as names ending with `Connection` are reserved for Relay connections. Set `pagination.offset_type_suffix: OffsetConnection` to keep the old names.
+- `Jav\ApiTopiaBundle\GraphQL\Relay\Relay` provides `toGlobalId()`, `fromGlobalId()`, `offsetToCursor()` and `cursorToOffset()`. If your code uses `GraphQLRelay\…` classes directly, switch to it or require `ivome/graphql-relay-php` in your application.
+- Introspection of an unknown type (`__type(name: "Unknown")`) returns `null` instead of an error.
+- The resource cache is invalidated when the `resource_directories` of a schema change.
+
 ### Security
 
 - Exception messages and stack traces are only exposed when `api_topia.debug` is enabled (defaults to `%kernel.debug%`).

@@ -2,7 +2,7 @@
 
 namespace Jav\ApiTopiaBundle\Tests\GraphQL\Logic;
 
-use GraphQLRelay\Relay;
+use Jav\ApiTopiaBundle\GraphQL\Relay\Relay;
 use Jav\ApiTopiaBundle\Test\AbstractApiTestCase;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\DeferredCompanyResolver;
 use Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test1\Resolver\DeferredOrdersResolver;

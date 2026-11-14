@@ -26,6 +26,12 @@ class ApiResourceObject2CollectionResolver implements QueryCollectionResolverInt
                 $context['pagination']['offset'] ?? 0, // But we need to tell him the 'offset' where the virtual array starts
                     $context['args']['howMany'] ?? 10 // And how many items are supposed to be in total
             ),
+            // Any iterable is accepted
+            'Generator' => (function () use ($objects) {
+                yield from $objects;
+            })(),
+            // Buggy resolver: always returns the first page, whatever $context['pagination'] says
+            'WrongPage' => new VirtualArrayPaginator(array_slice($objects, 0, 2), 0, count($objects)),
             default => $objects
         };
     }

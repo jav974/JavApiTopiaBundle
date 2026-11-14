@@ -5,7 +5,7 @@ namespace Jav\ApiTopiaBundle\GraphQL;
 use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Upload\UploadType;
-use GraphQLRelay\Connection\Connection;
+use Jav\ApiTopiaBundle\GraphQL\Relay\RelayTypes;
 use InvalidArgumentException;
 
 final class TypeRegistry
@@ -16,7 +16,7 @@ final class TypeRegistry
     public function __construct()
     {
         $this->types = Type::getStandardTypes();
-        $this->types['PageInfo'] = Connection::pageInfoType();
+        $this->types['PageInfo'] = RelayTypes::pageInfo();
         $this->types['input.Upload'] = new UploadType();
         $this->types['Upload'] =& $this->types['input.Upload'];
     }

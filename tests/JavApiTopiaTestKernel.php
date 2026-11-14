@@ -33,6 +33,7 @@ class JavApiTopiaTestKernel extends BaseKernel
     /**
      * Environments:
      * - "test": default bundle configuration (backward compatible behaviour)
+     * - "test_legacy": type names of versions < 1.1
      * - "test_strict": hardened configuration (no debug, spec status codes, limits, no introspection nor GraphiQL)
      */
     public function __construct(string $environment = 'test', bool $debug = true)
@@ -121,6 +122,12 @@ class JavApiTopiaTestKernel extends BaseKernel
                 ]
             ];
 
+            if ($this->environment === 'test_legacy') {
+                $apiTopiaConfig += [
+                    'pagination' => ['offset_type_suffix' => 'OffsetConnection'],
+                ];
+            }
+
             if ($this->environment === 'test_strict') {
                 $apiTopiaConfig += [
                     'debug' => false,
@@ -137,9 +144,13 @@ class JavApiTopiaTestKernel extends BaseKernel
             $container->loadFromExtension('twig', []);
 
             $container->register(FailingResolver::class)->addTag('apitopia.graphql_resolver');
+            $container->register(\Jav\ApiTopiaBundle\Tests\GraphQL\Schema\Test2\Resolver\ApiResourceObject2ByIdResolver::class)->addTag('apitopia.graphql_resolver');
             $container->register(DeferredCompanyResolver::class)->addTag('apitopia.graphql_resolver');
             $container->register(DeferredOrdersResolver::class)->addTag('apitopia.graphql_resolver');
-            $container->register(TestNodeResolver::class)->setAutoconfigured(true);
+            // Other environments use the automatic node refetch (item query of the type)
+            if ($this->environment === 'test') {
+                $container->register(TestNodeResolver::class)->setAutoconfigured(true);
+            }
             $container->register(UserResolver::class)->addTag('apitopia.graphql_resolver');
             $container->register(UsersResolver::class)->addTag('apitopia.graphql_resolver');
             $container->register(FavoriteProductsResolver::class)->addTag('apitopia.graphql_resolver');

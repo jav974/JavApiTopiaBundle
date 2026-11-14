@@ -2,7 +2,7 @@
 
 namespace Jav\ApiTopiaBundle\Tests\GraphQL\Logic;
 
-use GraphQLRelay\Connection\ArrayConnection;
+use Jav\ApiTopiaBundle\GraphQL\Relay\ArrayCursor;
 use Jav\ApiTopiaBundle\Test\AbstractApiTestCase;
 
 class Schema2QueryTest extends AbstractApiTestCase
@@ -250,7 +250,7 @@ class Schema2QueryTest extends AbstractApiTestCase
                     $direction === 'forwards' ? min($offset + $pageSize - 1, $howMany - 1) : ($offset === 0 ? 0 : $offset + $pageSize - 1)
                 ) as $i) {
                 $edges[] = [
-                    'cursor' => ArrayConnection::offsetToCursor($i),
+                    'cursor' => ArrayCursor::fromOffset($i),
                     'node' => [
                         '_id' => $i + 1,
                     ],
@@ -274,10 +274,12 @@ class Schema2QueryTest extends AbstractApiTestCase
                         'apiResourceSubObjectAsCursorBasedSubQueryCollection' => [
                             'totalCount' => $howMany,
                             'pageInfo' => [
-                                'hasNextPage' => !($direction === 'backwards') && $maxLoop > 0, // When paginating backwards, hasNextPage is always false
-                                'hasPreviousPage' => !($direction === 'forwards') && $maxLoop > 0, // When paginating forwards, hasPreviousPage is always false
-                                'startCursor' => ArrayConnection::offsetToCursor($offset),
-                                'endCursor' => ArrayConnection::offsetToCursor($endCursor),
+                                // Paginating forwards: more items after this page. Backwards: the "before" edge follows this page (Relay spec, HasNextPage step 2)
+                                'hasNextPage' => $direction === 'forwards' ? $maxLoop > 0 : $afterOrBefore !== null,
+                                // Paginating backwards: more items before this page. Forwards: the "after" edge precedes this page (Relay spec, HasPreviousPage step 2)
+                                'hasPreviousPage' => $direction === 'backwards' ? $maxLoop > 0 : $afterOrBefore !== null,
+                                'startCursor' => ArrayCursor::fromOffset($offset),
+                                'endCursor' => ArrayCursor::fromOffset($endCursor),
                             ],
                             'edges' => $edges
                         ],
@@ -286,10 +288,10 @@ class Schema2QueryTest extends AbstractApiTestCase
             ]);
 
             if ($direction === 'forwards') {
-                $afterOrBefore = ArrayConnection::offsetToCursor($offset + $pageSize - 1);
+                $afterOrBefore = ArrayCursor::fromOffset($offset + $pageSize - 1);
                 $offset += $pageSize;
             } else {
-                $afterOrBefore = ArrayConnection::offsetToCursor($offset);
+                $afterOrBefore = ArrayCursor::fromOffset($offset);
                 $offset = max($offset - $pageSize, 0);
             }
         }
