@@ -29,6 +29,9 @@ class TypeResolver
     /** @var array<string, array<string, Query|null>> Item queries able to refetch a node, by schema and type name */
     private array $nodeQueries = [];
 
+    /** @var (callable(string, string): ?Query)|null Finds the item query of a type without loading every resource */
+    private $nodeQueryLocator = null;
+
     public function __construct(
         private readonly ResourceLoader $resourceLoader,
         private readonly ResolverProvider $resolverProvider,
@@ -125,8 +128,20 @@ class TypeResolver
         return $resolve(null, ['id' => $id], $context, $info);
     }
 
+    /**
+     * @param callable(string, string): ?Query $locator Receives the schema and type names
+     */
+    public function setNodeQueryLocator(callable $locator): void
+    {
+        $this->nodeQueryLocator = $locator;
+    }
+
     private function getNodeQuery(string $schemaName, string $typeName): ?Query
     {
+        if ($this->nodeQueryLocator !== null) {
+            return $this->nodeQueries[$schemaName][$typeName] ??= ($this->nodeQueryLocator)($schemaName, $typeName);
+        }
+
         if (!array_key_exists($typeName, $this->nodeQueries[$schemaName] ?? [])) {
             $this->nodeQueries[$schemaName][$typeName] = null;
 
@@ -239,7 +254,8 @@ class TypeResolver
         $objectTypeData = [
             'name' => $reflectionClass->getShortName(),
             'description' => $attribute->description ?? ReflectionUtils::getDescriptionFromDocComment($reflectionClass->getDocComment() ?: null),
-            'fields' => function () use ($reflectionClass, $schemaName, $isNodeInterface) {
+            // Types created while building these fields belong to this type (lazy schema index)
+            'fields' => fn () => $this->typeRegistry->withOwner('type:' . $reflectionClass->getShortName(), function () use ($reflectionClass, $schemaName, $isNodeInterface) {
                 $properties = $this->reflectionUtils->extractFieldsInfoFromReflectionClass($reflectionClass);
                 $fields = [];
 
@@ -289,7 +305,7 @@ class TypeResolver
                 }
 
                 return $fields;
-            },
+            }),
         ];
 
         if ($isNodeInterface) {
@@ -312,7 +328,7 @@ class TypeResolver
         $type = new InputObjectType([
             'name' => $reflectionClass->getShortName(),
             'description' => $description,
-            'fields' => function () use ($reflectionClass, $schemaName) {
+            'fields' => fn () => $this->typeRegistry->withOwner('type:' . $reflectionClass->getShortName(), function () use ($reflectionClass, $schemaName) {
                 $properties = $this->reflectionUtils->extractFieldsInfoFromReflectionClass($reflectionClass);
                 $fields = [];
 
@@ -326,7 +342,7 @@ class TypeResolver
                 }
 
                 return $fields;
-            },
+            }),
         ]);
 
         $this->typeRegistry->register($schemaName . '.' . $reflectionClass->getShortName(), $type);

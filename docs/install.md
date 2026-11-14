@@ -136,6 +136,11 @@ api_topia:
   max_query_complexity: 500
 ```
 
+Performance
+-----------
+
+Schemas are built lazily from an index stored in the cache directory: a request only builds the operations and types it uses. Run `bin/console cache:warmup` when deploying, so that the index is ready before the first request. In debug mode, the index is refreshed automatically when a file of a resource directory changes.
+
 Relay
 -----
 

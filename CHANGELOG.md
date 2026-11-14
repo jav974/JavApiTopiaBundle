@@ -23,6 +23,12 @@
 - Introspection of an unknown type (`__type(name: "Unknown")`) returns `null` instead of an error.
 - The resource cache is invalidated when the `resource_directories` of a schema change.
 
+### Performance
+
+- Schemas are built lazily: only the root fields and types used by a request are built. What a schema contains is read from an index cached in the cache directory, built by `cache:warmup` (or on first use) and refreshed in debug mode when a resource directory changes.
+- Property information (types, descriptions) is cached outside debug mode, like Symfony's `property_info` service.
+- With 200 resources, a request takes about 2.3 ms instead of 10.9 ms (4.7x faster); with the small test schema, 2.1 ms instead of 3.4 ms.
+
 ### Security
 
 - Exception messages and stack traces are only exposed when `api_topia.debug` is enabled (defaults to `%kernel.debug%`).
