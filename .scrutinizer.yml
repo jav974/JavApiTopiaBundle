@@ -1,0 +1,30 @@
+build:
+    image: default-jammy
+    environment:
+        php:
+            version: 8.3
+    nodes:
+        analysis:
+            project_setup:
+                override:
+                    - 'true'
+            tests:
+                override:
+                    - php-scrutinizer-run
+                    -
+                        command: phpcs-run
+                        use_website_config: true
+filter:
+    excluded_paths:
+        - 'tests/GraphQL/Logic/*'
+        - 'tests/GraphQL/Output/*'
+    dependency_paths:
+        - 'tests/GraphQL/Schema/*'
+checks:
+    php: true
+coding_style:
+    php:
+        spaces:
+            around_operators:
+                bitwise: false
+                concatenation: true
