@@ -112,6 +112,8 @@ api_topia:
     default_limit: 50
     # Maximum page size a client may request (0 disables the cap)
     max_limit: 1000
+    # Suffix of offset paginated types ("OffsetConnection" keeps the names of versions < 1.1, see docs/relay.md)
+    offset_type_suffix: OffsetPage
 
   graphiql:
     # Expose the GraphiQL IDE on /api/graphiql/{schema}
@@ -134,23 +136,8 @@ api_topia:
   max_query_complexity: 500
 ```
 
-Relay `node` field
-------------------
+Relay
+-----
 
-To make the Relay `node(id: ID!)` field work, implement `Jav\ApiTopiaBundle\GraphQL\NodeResolverInterface`
-in a service (autoconfiguration registers it automatically).
-`$type` is `<schema name>.<GraphQL type name>` (e.g. `default_schema.User`) and `$id` is the raw identifier.
-Return the object (its short class name must match a GraphQL type of the schema) or `null`.
-
-```php
-final class NodeResolver implements NodeResolverInterface
-{
-    public function resolve(string $type, string $id): mixed
-    {
-        return match ($type) {
-            'default_schema.User' => $this->users->find($id),
-            default => null,
-        };
-    }
-}
-```
+Schemas follow the Relay server specification (`Node` interface, `node`/`nodes` fields, cursor connections).
+See [Relay compliance](relay.md).

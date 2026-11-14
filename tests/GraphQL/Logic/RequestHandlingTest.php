@@ -113,6 +113,13 @@ class RequestHandlingTest extends AbstractApiTestCase
     {
         $response = $this->graphQL('/test/graphql/test2', '{ apiResourceObject(id: 1) { apiResourceSubObjectAsCursorBasedSubQueryCollection(first: -1) { totalCount } } }');
 
-        $this->assertSame('Pagination arguments "first", "last" and "limit" must be positive integers.', $response['errors'][0]['message']);
+        $this->assertSame('Argument "first" must be a non-negative integer.', $response['errors'][0]['message']);
+    }
+
+    public function testIntrospectionOfUnknownType(): void
+    {
+        $response = $this->graphQL('/test/graphql/test1', '{ __type(name: "DoesNotExist") { name } }');
+
+        $this->assertSame(['data' => ['__type' => null]], $response);
     }
 }

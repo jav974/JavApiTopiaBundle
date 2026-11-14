@@ -21,7 +21,6 @@
     "ext-json": "*",
     "webonyx/graphql-php": "^15.0",
     "ecodev/graphql-upload": "^7.0 || ^8.0",
-    "ivome/graphql-relay-php": "^0.7",
     "nyholm/psr7": "^1.6",
     "phpdocumentor/reflection-docblock": "^5.3",
     "symfony/config": "^6.4 || ^7.0 || ^8.0",

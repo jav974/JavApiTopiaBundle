@@ -5,7 +5,7 @@ namespace Jav\ApiTopiaBundle\GraphQL;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Definition\WrappingType;
-use GraphQLRelay\Relay;
+use Jav\ApiTopiaBundle\GraphQL\Relay\RelayTypes;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 
@@ -13,10 +13,23 @@ class FieldsBuilder
 {
     private TypeResolver $typeResolver;
 
+    /** Suffix of offset paginated collection types. Names ending with "Connection" are reserved by the Relay specification. */
+    private string $offsetTypeSuffix = 'OffsetPage';
+
     public function __construct(
         private readonly TypeRegistry $typeRegistry,
         private readonly ResolverProvider $resolverProvider,
     ) {
+    }
+
+    public function setOffsetTypeSuffix(string $offsetTypeSuffix): void
+    {
+        $this->offsetTypeSuffix = $offsetTypeSuffix;
+    }
+
+    public function getOffsetTypeSuffix(): string
+    {
+        return $this->offsetTypeSuffix;
     }
 
     public function setTypeResolver(TypeResolver $typeResolver): void
@@ -46,7 +59,7 @@ class FieldsBuilder
         if ($attribute instanceof QueryCollection && $attribute->paginationEnabled) {
             if ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_CURSOR) {
                 $type = $this->getRelayConnectionType($schemaName, $outputClassName, $type);
-                $field['args'] += Relay::connectionArgs();
+                $field['args'] += RelayTypes::connectionArgs();
             } elseif ($attribute->paginationType === QueryCollection::PAGINATION_TYPE_OFFSET) {
                 $type = $this->getOffsetConnectionType($schemaName, $outputClassName, $type);
                 $field['args'] += $this->getOffsetConnectionArgs();
@@ -68,7 +81,7 @@ class FieldsBuilder
             $type = $type->getInnermostType();
         }
 
-        $connectionName = $outputClassName . 'OffsetConnection';
+        $connectionName = $outputClassName . $this->offsetTypeSuffix;
 
         if (!$this->typeRegistry->has("$schemaName.$connectionName")) {
             $this->typeRegistry->register("$schemaName.$connectionName", new ObjectType([
@@ -117,26 +130,19 @@ class FieldsBuilder
         $connectionName = $outputClassName . 'CursorConnection';
 
         if (!$this->typeRegistry->has("$schemaName.$edgeName")) {
-            $this->typeRegistry->register("$schemaName.$edgeName", Relay::edgeType([
-                'nodeType' => $type,
-                'name' => $outputClassName,
-            ]));
+            $this->typeRegistry->register("$schemaName.$edgeName", RelayTypes::edgeType($outputClassName, $type));
         }
 
+        /** @var ObjectType $edge */
         $edge = $this->typeRegistry->get("$schemaName.$edgeName");
 
         if (!$this->typeRegistry->has("$schemaName.$connectionName")) {
-            $this->typeRegistry->register("$schemaName.$connectionName", Relay::connectionType([
-                'nodeType' => $type,
-                'edgeType' => $edge,
-                'connectionFields' => [
-                    'totalCount' => [
-                        'type' => Type::nonNull(Type::int()),
-                        'description' => 'The total count of items in the connection.',
-                        'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
-                    ],
+            $this->typeRegistry->register("$schemaName.$connectionName", RelayTypes::connectionType($connectionName, $edge, [
+                'totalCount' => [
+                    'type' => Type::nonNull(Type::int()),
+                    'description' => 'The total count of items in the connection.',
+                    'resolve' => fn (array $root) => $root['totalCount'] ?? 0,
                 ],
-                'name' => $outputClassName . 'Cursor'
             ]));
         }
 

@@ -11,7 +11,10 @@ use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\PhpEnumType;
 use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Type\Definition\Type;
-use GraphQLRelay\Relay;
+use GraphQL\Type\Definition\InterfaceType;
+use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Query;
+use Jav\ApiTopiaBundle\GraphQL\Relay\GlobalId;
+use Jav\ApiTopiaBundle\GraphQL\Relay\RelayTypes;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\ApiResource;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Attribute;
 use Jav\ApiTopiaBundle\Serializer\Serializer;
@@ -21,8 +24,10 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class TypeResolver
 {
-    /** @var array<string, Type&NullableType>  */
-    private array $nodeDefinition;
+    private InterfaceType $nodeInterface;
+
+    /** @var array<string, array<string, Query|null>> Item queries able to refetch a node, by schema and type name */
+    private array $nodeQueries = [];
 
     public function __construct(
         private readonly ResourceLoader $resourceLoader,
@@ -33,17 +38,8 @@ class TypeResolver
         private readonly FieldsBuilder $fieldsBuilder,
         private readonly ?NodeResolverInterface $nodeResolver = null
     ) {
-        $this->nodeDefinition = Relay::nodeDefinitions(
-            function ($globalId) {
-                $idComponents = Relay::fromGlobalId($globalId);
-
-                return $this->nodeResolver?->resolve($idComponents['type'], $idComponents['id']);
-            },
-            function ($object, $context, ResolveInfo $info) {
-                return $this->resolveNodeType($object, $info);
-            }
-        );
-        $this->typeRegistry->register('Node', $this->nodeDefinition['nodeInterface']);
+        $this->nodeInterface = RelayTypes::nodeInterface(fn ($object, $context, ResolveInfo $info) => $this->resolveNodeType($object, $info));
+        $this->typeRegistry->register('Node', $this->nodeInterface);
         $this->fieldsBuilder->setTypeResolver($this);
     }
 
@@ -73,12 +69,101 @@ class TypeResolver
         return $type;
     }
 
-    /**
-     * @return array<string, Type&NullableType>
-     */
-    public function getNodeDefinition(): array
+    public function getNodeInterface(): InterfaceType
     {
-        return $this->nodeDefinition;
+        return $this->nodeInterface;
+    }
+
+    /**
+     * The "node" and "nodes" root fields of a schema.
+     *
+     * @return array{node: array<string, mixed>, nodes: array<string, mixed>}
+     */
+    public function getNodeFields(string $schemaName): array
+    {
+        $fetch = fn (string $globalId, mixed $context, ResolveInfo $info) => $this->fetchNode($schemaName, $globalId, $context, $info);
+
+        return [
+            'node' => RelayTypes::nodeField($this->nodeInterface, $fetch),
+            'nodes' => RelayTypes::nodesField($this->nodeInterface, $fetch),
+        ];
+    }
+
+    /**
+     * Refetches an object from its global ID.
+     *
+     * The application NodeResolverInterface is used when there is one. Otherwise the object is refetched with the
+     * item Query of its type that takes an "id" argument, so node(id) returns the identical object (Relay refetch).
+     */
+    public function fetchNode(string $schemaName, string $globalId, mixed $context, ResolveInfo $info): mixed
+    {
+        $decoded = GlobalId::decode($globalId);
+
+        if ($decoded === null) {
+            return null;
+        }
+
+        if ($this->nodeResolver !== null) {
+            return $this->nodeResolver->resolve($decoded['type'], $decoded['id']);
+        }
+
+        $parts = explode('.', $decoded['type'], 2);
+
+        if (count($parts) !== 2 || $parts[0] !== $schemaName) {
+            return null;
+        }
+
+        $query = $this->getNodeQuery($schemaName, $parts[1]);
+
+        if ($query === null) {
+            return null;
+        }
+
+        $id = $this->castNodeId($decoded['id'], $query->args['id']['type'] ?? 'ID');
+
+        if ($id === null) {
+            return null;
+        }
+
+        $resolve = $this->resolverProvider->getResolveCallback($schemaName, $query);
+
+        return $resolve(null, ['id' => $id], $context, $info);
+    }
+
+    private function getNodeQuery(string $schemaName, string $typeName): ?Query
+    {
+        if (!array_key_exists($typeName, $this->nodeQueries[$schemaName] ?? [])) {
+            $this->nodeQueries[$schemaName][$typeName] = null;
+
+            foreach ($this->resourceLoader->getResources($schemaName) as $classPath => $resource) {
+                /** @var Query $query */
+                foreach ($resource['queries'] as $query) {
+                    $output = ReflectionUtils::getClassNameFromClassPath($query->output ?? $classPath);
+
+                    if ($output === $typeName && isset($query->args['id'])) {
+                        $this->nodeQueries[$schemaName][$typeName] = $query;
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        return $this->nodeQueries[$schemaName][$typeName];
+    }
+
+    private function castNodeId(string $id, string $argType): int|float|string|null
+    {
+        $argType = rtrim($argType, '!');
+
+        if ($argType === 'Int') {
+            return preg_match('/^-?\d+$/', $id) === 1 ? (int) $id : null;
+        }
+
+        if ($argType === 'Float') {
+            return is_numeric($id) ? (float) $id : null;
+        }
+
+        return $id;
     }
 
     public function resolve(string $schemaName, string $classPath, bool $isCollection, bool $input = false): Type&NullableType
@@ -109,6 +194,18 @@ class TypeResolver
         }
 
         return $type;
+    }
+
+    /**
+     * @return (Type&NullableType)|null
+     */
+    public function findType(string $name, string $schemaName): ?Type
+    {
+        if ($this->typeRegistry->has($name)) {
+            return $this->typeRegistry->get($name);
+        }
+
+        return $this->typeRegistry->has("$schemaName.$name") ? $this->typeRegistry->get("$schemaName.$name") : null;
     }
 
     public function getType(string $name, ?string $schemaName = null): Type&NullableType
@@ -155,7 +252,7 @@ class TypeResolver
                 $fields = [];
 
                 if ($isNodeInterface) {
-                    $fields['id'] = Relay::globalIdField(
+                    $fields['id'] = RelayTypes::globalIdField(
                         "$schemaName.{$reflectionClass->getShortName()}",
                         fn ($object) => is_object($object) ? $object->id : (is_array($object) ? $object['id'] : null)
                     );
@@ -204,7 +301,7 @@ class TypeResolver
         ];
 
         if ($isNodeInterface) {
-            $objectTypeData['interfaces'] = [$this->nodeDefinition['nodeInterface']];
+            $objectTypeData['interfaces'] = [$this->nodeInterface];
         }
 
         $type = new ObjectType($objectTypeData);

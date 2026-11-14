@@ -42,7 +42,12 @@ class ApiTopiaExtension extends ConfigurableExtension
         $container
             ->getDefinition('jav_apitopia.graphql.schema_builder')
             ->addMethodCall('setConfig', [$mergedConfig['schemas'] ?? []])
-            ->addMethodCall('setSchemaOutputDirectory', [$mergedConfig['schema_output_dir']]);
+            ->addMethodCall('setSchemaOutputDirectory', [$mergedConfig['schema_output_dir']])
+            ->addMethodCall('setDebug', ['%kernel.debug%']);
+
+        $container
+            ->getDefinition('jav_apitopia.graphql.fields_builder')
+            ->addMethodCall('setOffsetTypeSuffix', [$mergedConfig['pagination']['offset_type_suffix']]);
 
         $container
             ->getDefinition('jav_apitopia.cache.resources_warmer')
@@ -61,7 +66,10 @@ class ApiTopiaExtension extends ConfigurableExtension
 
         $container
             ->getDefinition('jav_apitopia.graphql.resolver_provider')
-            ->addMethodCall('setPaginationOptions', [$mergedConfig['pagination']]);
+            ->addMethodCall('setPaginationOptions', [[
+                'default_limit' => $mergedConfig['pagination']['default_limit'],
+                'max_limit' => $mergedConfig['pagination']['max_limit'],
+            ]]);
 
         $graphQLEndpoints = [];
 

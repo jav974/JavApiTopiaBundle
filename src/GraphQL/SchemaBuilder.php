@@ -10,13 +10,14 @@ use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Schema;
 use GraphQL\Utils\SchemaPrinter;
-use GraphQLRelay\Relay;
+use Jav\ApiTopiaBundle\GraphQL\Relay\RelayTypes;
 use InvalidArgumentException;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Mutation;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Query;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\QueryCollection;
 use Jav\ApiTopiaBundle\Api\GraphQL\Attributes\Subscription;
 use JsonException;
+use LogicException;
 use RuntimeException;
 use Throwable;
 
@@ -30,6 +31,8 @@ class SchemaBuilder
 
     private string $schemaOutputDirectory;
 
+    private bool $debug = false;
+
     public function __construct(
         private readonly ResourceLoader $resourceLoader,
         private readonly TypeResolver $typeResolver,
@@ -37,6 +40,14 @@ class SchemaBuilder
         private readonly FieldsBuilder $fieldsBuilder,
         private readonly TypeRegistry $typeRegistry,
     ) {
+    }
+
+    /**
+     * In debug mode, schemas are checked against the Relay specification when they are built.
+     */
+    public function setDebug(bool|string|null $debug): void
+    {
+        $this->debug = filter_var($debug, FILTER_VALIDATE_BOOLEAN);
     }
 
     public function setSchemaOutputDirectory(string $schemaOutputDirectory): void
@@ -60,6 +71,7 @@ class SchemaBuilder
         foreach ($this->config as $schemaName => $config) {
             $this->schemas[$schemaName] = $this->buildSchema($schemaName, $config);
             $this->schemas[$schemaName]->assertValid();
+            $this->assertRelayCompliant($this->schemas[$schemaName], $schemaName);
 
             file_put_contents(
                 "$this->schemaOutputDirectory/schema.$schemaName.graphql",
@@ -78,7 +90,50 @@ class SchemaBuilder
             throw new InvalidArgumentException(sprintf('Schema "%s" not found.', $schemaName));
         }
 
-        return $this->schemas[$schemaName] = $this->buildSchema($schemaName, $this->config[$schemaName]);
+        $schema = $this->buildSchema($schemaName, $this->config[$schemaName]);
+
+        if ($this->debug) {
+            $this->assertRelayCompliant($schema, $schemaName);
+        }
+
+        return $this->schemas[$schemaName] = $schema;
+    }
+
+    /**
+     * Checks the type names reserved by the GraphQL Cursor Connections Specification:
+     * "PageInfo" and any object whose name ends with "Connection".
+     *
+     * @throws LogicException
+     */
+    public function assertRelayCompliant(Schema $schema, string $schemaName): void
+    {
+        $legacyOffsetSuffix = str_ends_with($this->fieldsBuilder->getOffsetTypeSuffix(), 'Connection')
+            ? $this->fieldsBuilder->getOffsetTypeSuffix()
+            : null;
+        $errors = [];
+
+        foreach ($schema->getTypeMap() as $name => $type) {
+            if ($name === 'PageInfo' && $type !== RelayTypes::pageInfo()) {
+                $errors[] = 'the type name "PageInfo" is reserved for connections page information';
+            }
+
+            if (!str_ends_with($name, 'Connection')) {
+                continue;
+            }
+
+            // Offset paginated types named with the legacy suffix, explicitly configured
+            if ($legacyOffsetSuffix !== null && str_ends_with($name, $legacyOffsetSuffix)) {
+                continue;
+            }
+
+            if (!$type instanceof ObjectType || !$type->hasField('edges') || !$type->hasField('pageInfo')) {
+                $errors[] = sprintf('"%s": type names ending with "Connection" are reserved for connections (objects with "edges" and "pageInfo" fields)', $name);
+            }
+        }
+
+        if ($errors !== []) {
+            throw new LogicException(sprintf('Schema "%s" does not follow the Relay specification: %s.', $schemaName, implode('; ', $errors)));
+        }
     }
 
     /**
@@ -102,7 +157,8 @@ class SchemaBuilder
                     'Query' => $query,
                     'Mutation' => $mutation,
                     'Subscription' => $subscription,
-                    default => $this->typeResolver->getType($name, $schemaName),
+                    // The type loader must return null for unknown types (e.g. introspection __type(name: "Unknown"))
+                    default => $this->typeResolver->findType($name, $schemaName),
                 };
             },
         ]);
@@ -111,9 +167,8 @@ class SchemaBuilder
     private function buildQueryObject(string $schemaName): ObjectType
     {
         $resources = $this->resourceLoader->getResources($schemaName);
-        $fields = [
-            'node' => $this->typeResolver->getNodeDefinition()['nodeField']
-        ];
+        $nodeFields = $this->typeResolver->getNodeFields($schemaName);
+        $fields = ['node' => $nodeFields['node']];
 
         foreach ($resources as $classPath => $resource) {
             /** @var Query[]|QueryCollection[] $queries */
@@ -140,6 +195,9 @@ class SchemaBuilder
             }
         }
 
+        // Plural identifying root field, unless the application already defines a "nodes" query
+        $fields['nodes'] ??= $nodeFields['nodes'];
+
         return new ObjectType([
             'name' => 'Query',
             'fields' => $fields
@@ -164,28 +222,27 @@ class SchemaBuilder
 
                 $outputType = $mutation->output ?? $classPath;
                 $fieldName = lcfirst(ReflectionUtils::getClassNameFromClassPath($classPath));
-                $mutationData = Relay::mutationWithClientMutationId([
-                    'name' => $operationName,
-                    'inputFields' => $mutation->input ? [] : $this->typeResolver->resolveAttributeArgs($schemaName, $mutation, true),
-                    'outputFields' => [
+                // An input class replaces the generated input type
+                $customInputType = $mutation->input ? $this->typeResolver->resolve($schemaName, $mutation->input, false, true) : null;
+
+                if ($customInputType !== null && !$customInputType instanceof InputObjectType) {
+                    throw new InvalidArgumentException(sprintf('The input of mutation "%s" must be a class, "%s" given.', $operationName, $mutation->input));
+                }
+
+                $mutationData = RelayTypes::mutation(
+                    $operationName,
+                    $mutation->input ? null : $this->typeResolver->resolveAttributeArgs($schemaName, $mutation, true),
+                    [
                         $fieldName => [
                             'type' => $this->typeResolver->resolve($schemaName, $outputType, false),
                             'resolve' => fn ($payload) => $payload['data']
                         ]
                     ],
-                    'mutateAndGetPayload' => $this->resolverProvider->getResolveCallback($schemaName, $mutation),
-                ]);
-
-                if ($mutation->input) {
-                    $mutationData['args']['input']['type'] = Type::nonNull($this->typeResolver->resolve($schemaName, $mutation->input, false, true));
-                }
-
-                /** @var Type&NullableType $inputType */
-                $inputType = $mutationData['args']['input']['type']->getWrappedType();
-
-                if (!isset($inputType->name)) {
-                    throw new InvalidArgumentException("No name found for input type");
-                }
+                    $this->resolverProvider->getResolveCallback($schemaName, $mutation),
+                    $customInputType
+                );
+                $inputType = $mutationData['inputType'];
+                unset($mutationData['inputType']);
 
                 $this->typeRegistry->register("$schemaName.$inputType->name", $inputType);
                 $this->typeRegistry->register("$schemaName.{$mutationData['type']->name}", $mutationData['type']);
