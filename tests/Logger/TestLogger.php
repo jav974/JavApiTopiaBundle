@@ -12,7 +12,10 @@ class TestLogger extends AbstractLogger
     /** @var list<array{0: string, 1: string, 2: array<string, mixed>}> */
     private array $logs = [];
 
-    public function log($level, \Stringable|string $message, array $context = []): void
+    /**
+     * Untyped $message: compatible with psr/log 1 (lowest dependencies) to 3
+     */
+    public function log($level, $message, array $context = []): void
     {
         $this->logs[] = [(string) $level, (string) $message, $context];
     }
