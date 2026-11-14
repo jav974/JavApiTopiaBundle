@@ -4,7 +4,7 @@ namespace Jav\ApiTopiaBundle\Tests\GraphQL\Logic;
 
 use Jav\ApiTopiaBundle\Test\AbstractApiTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Symfony\Component\ErrorHandler\BufferingLogger;
+use Jav\ApiTopiaBundle\Tests\Logger\TestLogger;
 
 /**
  * Errors are exposed with a code (extensions.code); internal errors are hidden and logged.
@@ -30,7 +30,7 @@ class ErrorsTest extends AbstractApiTestCase
      */
     private function logs(): array
     {
-        /** @var BufferingLogger $logger */
+        /** @var TestLogger $logger */
         $logger = static::getContainer()->get('logger');
 
         $logs = array_map(fn (array $log) => ['level' => $log[0], 'message' => $log[1], 'context' => $log[2]], $logger->cleanLogs());
@@ -51,6 +51,8 @@ class ErrorsTest extends AbstractApiTestCase
         yield 'mapped exception, message hidden' => ['mappedHidden', 'PAYMENT_FAILED', 'Internal server error', []];
         yield 'HTTP 404' => ['httpNotFound', 'NOT_FOUND', 'No such page', []];
         yield 'HTTP 403' => ['httpForbidden', 'FORBIDDEN', 'Admins only', []];
+        yield 'HTTP 401' => ['httpUnauthorized', 'UNAUTHENTICATED', 'Token expired', []];
+        yield 'HTTP 400' => ['httpBadRequest', 'BAD_USER_INPUT', 'Malformed filter', []];
         yield 'graphql-php UserError' => ['userError', 'BAD_USER_INPUT', 'Bad argument', []];
         yield 'Symfony ValidationFailedException' => ['validation', 'BAD_USER_INPUT', 'Validation failed', [
             'violations' => [['path' => 'name', 'message' => 'Too short', 'code' => 'TOO_SHORT']],

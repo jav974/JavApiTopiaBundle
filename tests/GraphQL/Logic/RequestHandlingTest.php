@@ -124,4 +124,23 @@ class RequestHandlingTest extends AbstractApiTestCase
 
         $this->assertSame(['data' => ['__type' => null]], $response);
     }
+
+    public function testGetRequest(): void
+    {
+        $this->kernelBrowser->request('GET', '/test/graphql/test1?query=' . rawurlencode('{ users { _id } }'), [], [], ['CONTENT_TYPE' => '']);
+        $response = json_decode($this->kernelBrowser->getResponse()->getContent(), true);
+
+        $this->assertSame(['data' => ['users' => [['_id' => 1], ['_id' => 2]]]], $response);
+    }
+
+    public function testUploadLargerThanPostMaxSize(): void
+    {
+        $this->kernelBrowser->request('POST', '/test/graphql/test1', ['operations' => '{}', 'map' => '{}'], [], [
+            'CONTENT_TYPE' => 'multipart/form-data',
+            'CONTENT_LENGTH' => PHP_INT_MAX,
+        ]);
+
+        $this->assertSame(413, $this->kernelBrowser->getResponse()->getStatusCode());
+        $this->assertStringContainsString('post_max_size', $this->kernelBrowser->getResponse()->getContent());
+    }
 }

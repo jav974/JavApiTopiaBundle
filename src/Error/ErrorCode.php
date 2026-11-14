@@ -21,8 +21,4 @@ final class ErrorCode
     public const NOT_FOUND = 'NOT_FOUND';
     /** Unexpected server error: details are hidden outside debug mode, and logged */
     public const INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR';
-
-    private function __construct()
-    {
-    }
 }
